@@ -113,7 +113,7 @@ export default function HomeScreen() {
             )}
           </Pressable>
           <Image
-            source={require("@/assets/images/logo.png")}
+            source={require("@/assets/images/logo_rounded.png")}
             style={styles.headerLogo}
             contentFit="contain"
           />

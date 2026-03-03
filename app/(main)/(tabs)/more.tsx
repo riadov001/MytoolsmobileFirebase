@@ -103,7 +103,7 @@ export default function MoreScreen() {
 
         <View style={styles.footer}>
           <Image
-            source={require("@/assets/images/logo.png")}
+            source={require("@/assets/images/logo_rounded.png")}
             style={styles.footerLogo}
             contentFit="contain"
           />
