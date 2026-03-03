@@ -27,14 +27,12 @@ if (Platform.OS !== "web") {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { login, biometricLogin, verify2FA } = useAuth();
+  const { login, biometricLogin } = useAuth();
   const { showAlert, AlertComponent } = useCustomAlert();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [show2FA, setShow2FA] = useState(false);
-  const [twoFactorCode, setTwoFactorCode] = useState("");
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricType, setBiometricType] = useState("");
 
@@ -88,37 +86,12 @@ export default function LoginScreen() {
     }
     setLoading(true);
     try {
-      const result = await login({ email: email.trim(), password });
-      if ((result as any)?.requires2FA) {
-        setShow2FA(true);
-        setLoading(false);
-        return;
-      }
+      await login({ email: email.trim(), password });
       setTimeout(() => {
         router.replace("/(main)/(tabs)" as any);
       }, 50);
     } catch (err: any) {
       showAlert({ type: 'error', title: 'Erreur de connexion', message: err.message || 'Identifiants incorrects.', buttons: [{ text: 'OK', style: 'primary' }] });
-      setLoading(false);
-    }
-  };
-
-  const handleVerify2FA = async () => {
-    if (!twoFactorCode.trim()) {
-      showAlert({ type: 'error', title: 'Erreur', message: 'Veuillez saisir le code reçu par email.', buttons: [{ text: 'OK', style: 'primary' }] });
-      return;
-    }
-    setLoading(true);
-    try {
-      const result = await verify2FA(email.trim(), twoFactorCode.trim());
-      if (result?.user) {
-        setTimeout(() => {
-          router.replace("/(main)/(tabs)" as any);
-        }, 50);
-      }
-    } catch (err: any) {
-      showAlert({ type: 'error', title: 'Erreur', message: err.message || 'Code invalide.', buttons: [{ text: 'OK', style: 'primary' }] });
-    } finally {
       setLoading(false);
     }
   };
@@ -152,119 +125,79 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.form}>
-          {show2FA ? (
-            <>
-              <Text style={styles.title}>Vérification</Text>
-              <Text style={styles.subtitle}>Saisissez le code reçu par email à {email}</Text>
-              
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Code de vérification</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={twoFactorCode}
-                    onChangeText={setTwoFactorCode}
-                    placeholder="Entrez le code"
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Email</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value={email}
+                onChangeText={setEmail}
+                placeholder="votre@email.com"
+                placeholderTextColor={Colors.textTertiary}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+              />
+            </View>
+          </View>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.loginBtn,
-                  pressed && styles.loginBtnPressed,
-                  loading && styles.loginBtnDisabled,
-                ]}
-                onPress={handleVerify2FA}
-                disabled={loading}
-              >
-                {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.loginBtnText}>Vérifier</Text>}
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Mot de passe</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Votre mot de passe"
+                placeholderTextColor={Colors.textTertiary}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+              />
+              <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+                <Ionicons
+                  name={showPassword ? "eye-off-outline" : "eye-outline"}
+                  size={20}
+                  color={Colors.textSecondary}
+                />
               </Pressable>
+            </View>
+            <Pressable onPress={() => router.push("/(auth)/forgot-password")} style={styles.forgotBtn}>
+              <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+            </Pressable>
+          </View>
 
-              <Pressable onPress={() => setShow2FA(false)} style={styles.resendBtn}>
-                <Text style={styles.resendBtnText}>Retour à la connexion</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="votre@email.com"
-                    placeholderTextColor={Colors.textTertiary}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
-              </View>
+          <Pressable
+            style={({ pressed }) => [
+              styles.loginBtn,
+              pressed && styles.loginBtnPressed,
+              loading && styles.loginBtnDisabled,
+            ]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.loginBtnText}>Se connecter</Text>
+            )}
+          </Pressable>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Mot de passe</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="lock-closed-outline" size={20} color={Colors.textSecondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="Votre mot de passe"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                  />
-                  <Pressable onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                    <Ionicons
-                      name={showPassword ? "eye-off-outline" : "eye-outline"}
-                      size={20}
-                      color={Colors.textSecondary}
-                    />
-                  </Pressable>
-                </View>
-                <Pressable onPress={() => router.push("/(auth)/forgot-password")} style={styles.forgotBtn}>
-                  <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
-                </Pressable>
-              </View>
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>ou</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
-              <Pressable
-                style={({ pressed }) => [
-                  styles.loginBtn,
-                  pressed && styles.loginBtnPressed,
-                  loading && styles.loginBtnDisabled,
-                ]}
-                onPress={handleLogin}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.loginBtnText}>Se connecter</Text>
-                )}
-              </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
+            onPress={() => router.push("/(auth)/register")}
+          >
+            <Text style={styles.registerBtnText}>Créer un compte</Text>
+          </Pressable>
 
-              <View style={styles.divider}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>ou</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              <Pressable
-                style={({ pressed }) => [styles.registerBtn, pressed && styles.registerBtnPressed]}
-                onPress={() => router.push("/(auth)/register")}
-              >
-                <Text style={styles.registerBtnText}>Créer un compte</Text>
-              </Pressable>
-            </>
-          )}
-
-          {biometricAvailable && !show2FA && (
+          {biometricAvailable && (
             <Pressable
               style={({ pressed }) => [styles.biometricBtn, pressed && styles.biometricBtnPressed]}
               onPress={handleBiometricLogin}
@@ -275,11 +208,9 @@ export default function LoginScreen() {
             </Pressable>
           )}
 
-          {!show2FA && (
-            <View style={styles.versionContainer}>
-              <Text style={styles.versionText}>v1.0</Text>
-            </View>
-          )}
+          <View style={styles.versionContainer}>
+            <Text style={styles.versionText}>v1.0</Text>
+          </View>
         </View>
       </ScrollView>
       {AlertComponent}

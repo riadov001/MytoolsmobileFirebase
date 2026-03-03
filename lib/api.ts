@@ -230,7 +230,7 @@ export const authApi = {
     }),
 
   login: (data: LoginData) =>
-    apiCall<{ user?: UserProfile; requires2FA?: boolean; email?: string }>("/api/login", {
+    apiCall<{ user?: UserProfile; email?: string }>("/api/login", {
       method: "POST",
       body: data,
     }),

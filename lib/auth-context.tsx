@@ -18,7 +18,6 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   login: (data: LoginData) => Promise<any>;
-  verify2FA: (email: string, code: string) => Promise<any>;
   register: (data: RegisterData) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -103,9 +102,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (data: LoginData) => {
     try {
       const result = await authApi.login(data);
-      if (result?.requires2FA) {
-        return result;
-      }
       if (result?.user) {
         setUser(result.user);
       } else if ((result as any)?.id) {
@@ -119,24 +115,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return result;
     } catch (error) {
       console.error("Login error:", error instanceof Error ? error.message : error);
-      throw error;
-    }
-  };
-
-  const verify2FA = async (email: string, code: string) => {
-    try {
-      const result = await authApi.verify2FA(email, code);
-      if (result?.user) {
-        setUser(result.user);
-        const { getSessionCookie } = require("./api");
-        const cookie = getSessionCookie();
-        if (cookie) {
-          await storeToken("session_cookie", cookie);
-        }
-      }
-      return result;
-    } catch (error) {
-      console.error("2FA Verification error:", error instanceof Error ? error.message : error);
       throw error;
     }
   };
@@ -203,7 +181,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading,
       isAuthenticated: !!user,
       login,
-      verify2FA,
       register,
       logout,
       refreshUser,
