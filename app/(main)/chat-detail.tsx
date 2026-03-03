@@ -7,9 +7,9 @@ import {
   TextInput,
   Pressable,
   Platform,
-  KeyboardAvoidingView,
   ActivityIndicator,
 } from "react-native";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -87,11 +87,13 @@ export default function ChatDetailScreen() {
     sendMutation.mutate(trimmed);
   };
 
+  const bottomPad = Platform.OS === "web" ? 34 : Math.max(insets.bottom, 12);
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={90}
+      behavior="padding"
+      keyboardVerticalOffset={0}
     >
       <View
         style={[
@@ -110,6 +112,11 @@ export default function ChatDetailScreen() {
 
       {isLoading ? (
         <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
+      ) : messages.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="chatbubble-outline" size={40} color={Colors.textTertiary} />
+          <Text style={styles.emptyText}>Aucun message</Text>
+        </View>
       ) : (
         <FlatList
           data={messages}
@@ -117,24 +124,18 @@ export default function ChatDetailScreen() {
           renderItem={({ item }) => (
             <MessageBubble message={item} isMe={item.senderId === user?.id} />
           )}
-          inverted={!!messages.length}
+          inverted
           contentContainerStyle={styles.messagesList}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubble-outline" size={40} color={Colors.textTertiary} />
-              <Text style={styles.emptyText}>Aucun message</Text>
-            </View>
-          }
         />
       )}
 
       <View
         style={[
           styles.inputContainer,
-          { paddingBottom: Platform.OS === "web" ? 34 : Math.max(insets.bottom, 8) },
+          { paddingBottom: bottomPad },
         ]}
       >
         <TextInput
@@ -155,7 +156,7 @@ export default function ChatDetailScreen() {
           ]}
           disabled={!messageText.trim() || sendMutation.isPending}
         >
-          <Ionicons name="send" size={20} color="#FFFFFF" />
+          <Ionicons name="send" size={18} color="#FFFFFF" />
         </Pressable>
       </View>
     </KeyboardAvoidingView>
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 17,
     fontFamily: "Inter_600SemiBold",
     color: Colors.text,
     textAlign: "center",
@@ -189,12 +190,12 @@ const styles = StyleSheet.create({
   },
   messagesList: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    paddingTop: 12,
+    paddingBottom: 8,
   },
   bubbleRow: {
     flexDirection: "row",
-    marginBottom: 4,
+    marginBottom: 8,
   },
   bubbleRowLeft: {
     justifyContent: "flex-start",
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: "78%",
-    borderRadius: 16,
+    borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
@@ -222,13 +223,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: Colors.primary,
-    marginBottom: 2,
+    marginBottom: 3,
   },
   messageText: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
-    lineHeight: 20,
+    lineHeight: 21,
+    flexShrink: 1,
   },
   messageTextMe: {
     color: "#FFFFFF",
@@ -237,17 +239,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: Colors.textTertiary,
-    marginTop: 4,
+    marginTop: 5,
     alignSelf: "flex-end",
   },
   timeTextMe: {
-    color: "rgba(255,255,255,0.7)",
+    color: "rgba(255,255,255,0.65)",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 12,
-    paddingTop: 8,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
     backgroundColor: Colors.background,
@@ -256,13 +258,14 @@ const styles = StyleSheet.create({
   textInput: {
     flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: 20,
+    borderRadius: 22,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: Platform.OS === "ios" ? 10 : 8,
     fontSize: 15,
     fontFamily: "Inter_400Regular",
     color: Colors.text,
-    maxHeight: 100,
+    minHeight: 42,
+    maxHeight: 120,
     borderWidth: 1,
     borderColor: Colors.border,
   },
@@ -273,6 +276,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
+    marginBottom: 0,
   },
   sendButtonDisabled: {
     backgroundColor: Colors.surfaceSecondary,
@@ -281,9 +285,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
   },
   emptyContainer: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingTop: 80,
     gap: 8,
   },
   emptyText: {
