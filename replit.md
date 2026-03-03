@@ -96,8 +96,23 @@ server/
 - Account deletion implemented: DELETE /api/users/me
 - No third-party AI data sharing from mobile app
 
+## App Store Compliance Notes
+- Profile screen is READ-ONLY (no editing, no password change) — redirects to web portal
+- No payment functionality in the app — invoices are read-only consultation only
+- Delete account page fully translated to French
+- Privacy policy: no Stripe/payment mention
+- Legal page: section about read-only features and web portal for modifications
+- Onboarding screen accessible from More > Guide de l'application
+
 ## Recent Changes
 - Feb 2026: Initial build of MyJantes mobile app
 - Feb 2026: Thème sombre complet (noir/rouge/blanc)
 - Feb 2026: Push notifications, biometric auth
 - Feb 25 2026: Apple 5.1.1(v) compliance: removed all AI features, admin screens, role-based UI; added permanent account deletion
+- Mar 2026: Profile editing disabled, password change removed — web portal redirect message added
+- Mar 2026: Removed adminPaymentsApi and paymentLink from api.ts
+- Mar 2026: Privacy policy updated (removed Stripe section 8)
+- Mar 2026: Legal page updated with section 6 about app functionality (no payments, read-only)
+- Mar 2026: delete-account.tsx fully translated to French
+- Mar 2026: Onboarding screen created with 5 slides explaining app features
+- Mar 2026: "Guide de l'application" link added to More menu

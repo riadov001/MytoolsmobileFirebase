@@ -86,6 +86,13 @@ export default function MoreScreen() {
         <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Application</Text>
           <MenuItem
+            icon="book-outline"
+            title="Guide de l'application"
+            subtitle="Découvrir les fonctionnalités"
+            onPress={() => router.push("/onboarding")}
+            iconColor="#F59E0B"
+          />
+          <MenuItem
             icon="information-circle-outline"
             title="Version"
             subtitle="1.0"

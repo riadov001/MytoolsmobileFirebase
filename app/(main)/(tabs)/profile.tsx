@@ -204,48 +204,41 @@ export default function ProfileScreen() {
           <>
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Informations personnelles</Text>
-              {renderField("Email", user?.email || "", () => {}, "mail-outline", { editable: false })}
-              {renderField("Prénom", firstName, setFirstName, "person-outline")}
-              {renderField("Nom", lastName, setLastName, "person-outline")}
-              {renderField("Téléphone", phone, setPhone, "call-outline", { keyboardType: "phone-pad" })}
-              {renderField("Adresse", address, setAddress, "location-outline")}
-              {renderField("Code postal", postalCode, setPostalCode, "navigate-outline", { keyboardType: "numeric", maxLength: 5 })}
-              {renderField("Ville", city, setCity, "business-outline")}
+              {renderField("Email", user?.email || "", "mail-outline")}
+              {renderField("Prénom", user?.firstName || "", "person-outline")}
+              {renderField("Nom", user?.lastName || "", "person-outline")}
+              {renderField("Téléphone", user?.phone || "", "call-outline")}
+              {renderField("Adresse", user?.address || "", "location-outline")}
+              {renderField("Code postal", user?.postalCode || "", "navigate-outline")}
+              {renderField("Ville", user?.city || "", "business-outline")}
             </View>
 
             {isPro && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Informations société</Text>
-                {renderField("Nom entreprise", companyName, setCompanyName, "business-outline")}
-                {renderField("SIRET", siret, setSiret, "document-text-outline", { maxLength: 14 })}
-                {renderField("N° TVA", tvaNumber, setTvaNumber, "receipt-outline")}
-                {renderField("Adresse société", companyAddress, setCompanyAddress, "location-outline")}
-                {renderField("CP société", companyPostalCode, setCompanyPostalCode, "navigate-outline", { keyboardType: "numeric", maxLength: 5 })}
-                {renderField("Ville société", companyCity, setCompanyCity, "business-outline")}
-                {renderField("Pays société", companyCountry, setCompanyCountry, "globe-outline")}
+                {renderField("Nom entreprise", user?.companyName || "", "business-outline")}
+                {renderField("SIRET", user?.siret || "", "document-text-outline")}
+                {renderField("N° TVA", user?.tvaNumber || "", "receipt-outline")}
+                {renderField("Adresse société", user?.companyAddress || "", "location-outline")}
+                {renderField("CP société", user?.companyPostalCode || "", "navigate-outline")}
+                {renderField("Ville société", user?.companyCity || "", "business-outline")}
+                {renderField("Pays société", user?.companyCountry || "", "globe-outline")}
               </View>
             )}
 
-            {editing && (
-              <Pressable style={styles.cancelBtn} onPress={() => {
-                setFirstName(user?.firstName || "");
-                setLastName(user?.lastName || "");
-                setPhone(user?.phone || "");
-                setAddress(user?.address || "");
-                setPostalCode(user?.postalCode || "");
-                setCity(user?.city || "");
-                setCompanyName(user?.companyName || "");
-                setSiret(user?.siret || "");
-                setTvaNumber(user?.tvaNumber || "");
-                setCompanyAddress(user?.companyAddress || "");
-                setCompanyPostalCode(user?.companyPostalCode || "");
-                setCompanyCity(user?.companyCity || "");
-                setCompanyCountry(user?.companyCountry || "France");
-                setEditing(false);
-              }}>
-                <Text style={styles.cancelBtnText}>Annuler les modifications</Text>
+            <View style={styles.webPortalCard}>
+              <View style={styles.webPortalIconContainer}>
+                <Ionicons name="information-circle" size={24} color={Colors.primary} />
+              </View>
+              <Text style={styles.webPortalMessage}>{SECURITY_MESSAGE}</Text>
+              <Pressable
+                style={({ pressed }) => [styles.webPortalBtn, pressed && { opacity: 0.8 }]}
+                onPress={openWebPortal}
+              >
+                <Ionicons name="open-outline" size={18} color="#fff" />
+                <Text style={styles.webPortalBtnText}>Accéder à l'espace client</Text>
               </Pressable>
-            )}
+            </View>
           </>
         )}
 
@@ -275,90 +268,20 @@ export default function ProfileScreen() {
             )}
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Modifier le mot de passe</Text>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Mot de passe actuel</Text>
-                <View style={styles.passwordInputContainer}>
-                  <Ionicons name="lock-closed-outline" size={18} color={Colors.textSecondary} style={styles.fieldIcon} />
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={currentPassword}
-                    onChangeText={setCurrentPassword}
-                    placeholder="Mot de passe actuel"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showCurrentPassword}
-                    autoCapitalize="none"
-                  />
-                  <Pressable onPress={() => setShowCurrentPassword(!showCurrentPassword)} style={styles.eyeBtn}>
-                    <Ionicons name={showCurrentPassword ? "eye-off-outline" : "eye-outline"} size={18} color={Colors.textSecondary} />
-                  </Pressable>
+              <Text style={styles.sectionTitle}>Mot de passe</Text>
+              <View style={styles.webPortalCard}>
+                <View style={styles.webPortalIconContainer}>
+                  <Ionicons name="lock-closed" size={24} color={Colors.primary} />
                 </View>
+                <Text style={styles.webPortalMessage}>{SECURITY_MESSAGE}</Text>
+                <Pressable
+                  style={({ pressed }) => [styles.webPortalBtn, pressed && { opacity: 0.8 }]}
+                  onPress={openWebPortal}
+                >
+                  <Ionicons name="open-outline" size={18} color="#fff" />
+                  <Text style={styles.webPortalBtnText}>Modifier sur le site</Text>
+                </Pressable>
               </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Nouveau mot de passe</Text>
-                <View style={styles.passwordInputContainer}>
-                  <Ionicons name="lock-open-outline" size={18} color={Colors.textSecondary} style={styles.fieldIcon} />
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={newPassword}
-                    onChangeText={setNewPassword}
-                    placeholder="Nouveau mot de passe"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry={!showNewPassword}
-                    autoCapitalize="none"
-                  />
-                  <Pressable onPress={() => setShowNewPassword(!showNewPassword)} style={styles.eyeBtn}>
-                    <Ionicons name={showNewPassword ? "eye-off-outline" : "eye-outline"} size={18} color={Colors.textSecondary} />
-                  </Pressable>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Confirmer</Text>
-                <View style={styles.passwordInputContainer}>
-                  <Ionicons name="lock-closed-outline" size={18} color={Colors.textSecondary} style={styles.fieldIcon} />
-                  <TextInput
-                    style={styles.passwordInput}
-                    value={confirmPassword}
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirmer le mot de passe"
-                    placeholderTextColor={Colors.textTertiary}
-                    secureTextEntry
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {newPassword.length > 0 && (
-                <View style={styles.strengthBox}>
-                  <View style={styles.strengthItem}>
-                    <Ionicons name={newPassword.length >= 8 ? "checkmark-circle" : "ellipse-outline"} size={14} color={newPassword.length >= 8 ? Colors.success : Colors.textTertiary} />
-                    <Text style={[styles.strengthText, newPassword.length >= 8 && { color: Colors.success }]}>8+ caractères</Text>
-                  </View>
-                  <View style={styles.strengthItem}>
-                    <Ionicons name={/[A-Z]/.test(newPassword) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[A-Z]/.test(newPassword) ? Colors.success : Colors.textTertiary} />
-                    <Text style={[styles.strengthText, /[A-Z]/.test(newPassword) && { color: Colors.success }]}>Majuscule</Text>
-                  </View>
-                  <View style={styles.strengthItem}>
-                    <Ionicons name={/[0-9]/.test(newPassword) ? "checkmark-circle" : "ellipse-outline"} size={14} color={/[0-9]/.test(newPassword) ? Colors.success : Colors.textTertiary} />
-                    <Text style={[styles.strengthText, /[0-9]/.test(newPassword) && { color: Colors.success }]}>Chiffre</Text>
-                  </View>
-                  <View style={styles.strengthItem}>
-                    <Ionicons name={newPassword === confirmPassword && confirmPassword.length > 0 ? "checkmark-circle" : "ellipse-outline"} size={14} color={newPassword === confirmPassword && confirmPassword.length > 0 ? Colors.success : Colors.textTertiary} />
-                    <Text style={[styles.strengthText, newPassword === confirmPassword && confirmPassword.length > 0 && { color: Colors.success }]}>Identiques</Text>
-                  </View>
-                </View>
-              )}
-
-              <Pressable
-                style={({ pressed }) => [styles.changePasswordBtn, pressed && { backgroundColor: Colors.primaryDark }, changingPassword && { opacity: 0.7 }]}
-                onPress={handleChangePassword}
-                disabled={changingPassword}
-              >
-                {changingPassword ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.changePasswordBtnText}>Modifier le mot de passe</Text>}
-              </Pressable>
             </View>
           </>
         )}
@@ -564,25 +487,6 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginLeft: 4,
   },
-  fieldInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.primary,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  fieldIcon: {
-    marginRight: 8,
-  },
-  fieldInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-  },
   fieldValueRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -602,14 +506,45 @@ const styles = StyleSheet.create({
   fieldValueEmpty: {
     color: Colors.textTertiary,
   },
-  cancelBtn: {
+  webPortalCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 20,
     alignItems: "center",
-    marginBottom: 16,
+    gap: 12,
   },
-  cancelBtnText: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
+  webPortalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: `${Colors.primary}15`,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  webPortalMessage: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  webPortalBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    height: 44,
+    paddingHorizontal: 20,
+    width: "100%",
+  },
+  webPortalBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
   },
   settingRow: {
     flexDirection: "row",
@@ -647,70 +582,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
     marginTop: 2,
-  },
-  inputGroup: {
-    gap: 4,
-  },
-  inputLabel: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.textTertiary,
-    marginLeft: 4,
-  },
-  passwordInputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    paddingHorizontal: 12,
-    height: 44,
-  },
-  passwordInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-  },
-  eyeBtn: {
-    height: "100%",
-    width: 36,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  strengthBox: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    backgroundColor: Colors.surface,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    padding: 10,
-  },
-  strengthItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  strengthText: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textTertiary,
-  },
-  changePasswordBtn: {
-    backgroundColor: Colors.primary,
-    borderRadius: 12,
-    height: 48,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 4,
-  },
-  changePasswordBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
   },
   notifInfoBox: {
     flexDirection: "row",

@@ -30,6 +30,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(main)" options={{ headerShown: false }} />
       <Stack.Screen name="legal" options={{ presentation: "modal", headerShown: true, title: "Mentions Légales" }} />
       <Stack.Screen name="privacy" options={{ presentation: "modal", headerShown: true, title: "Politique de Confidentialité" }} />
+      <Stack.Screen name="onboarding" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="support" options={{ presentation: "formSheet", sheetAllowedDetents: [0.75], sheetGrabberVisible: true, headerShown: false }} />
     </Stack>
   );
