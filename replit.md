@@ -104,6 +104,19 @@ server/
 - Legal page: section about read-only features and web portal for modifications
 - Onboarding screen accessible from More > Guide de l'application
 
+## API Response Handling
+- API responses are auto-unwrapped: `unwrapList()` and `unwrapSingle()` in `lib/api.ts` handle wrapped responses (`{ data: [...] }`, `{ results: [...] }`, etc.)
+- Invoice/quote amounts use extensive field name fallbacks (camelCase + snake_case): `totalHT`, `total_ht`, `totalTTC`, `total_ttc`, `tvaAmount`, `tva_amount`, etc.
+- Quote accept/reject tries multiple endpoint patterns: `/accept`, `/respond`, and PUT status update as fallbacks
+- Reservation cancel/confirm also tries fallback PUT status update
+- Server proxy logs all API responses to `/tmp/api_debug_*.json` files for debugging
+
+## Quote Status Flow
+- `pending` → `sent` → `approved` (admin approved) → `accepted` (client accepted)
+- `canRespond` shows Accept/Reject buttons for: `approved`, `approuvé`, `sent`, `envoyé`
+- `isAccepted` shows "Demander une réservation" for: `accepted`, `accepté`, `confirmed`, `confirmé`
+- Reservation modify/cancel has 24h restriction before scheduled date
+
 ## Recent Changes
 - Feb 2026: Initial build of MyJantes mobile app
 - Feb 2026: Thème sombre complet (noir/rouge/blanc)
@@ -116,3 +129,7 @@ server/
 - Mar 2026: delete-account.tsx fully translated to French
 - Mar 2026: Onboarding screen created with 5 slides explaining app features
 - Mar 2026: "Guide de l'application" link added to More menu
+- Mar 3 2026: API response unwrapping (unwrapList/unwrapSingle) to handle wrapped API responses
+- Mar 3 2026: Quote accept/reject with multi-endpoint fallbacks
+- Mar 3 2026: Invoice/quote amount field name fallbacks (camelCase + snake_case)
+- Mar 3 2026: Server proxy debug logging to /tmp/api_debug_*.json

@@ -241,17 +241,27 @@ export const authApi = {
       body: data,
     }),
 
-  login: (data: LoginData) =>
-    apiCall<{ user: UserProfile }>("/api/login", {
+  login: async (data: LoginData) => {
+    const result = await apiCall<any>("/api/login", {
       method: "POST",
       body: data,
-    }),
+    });
+    if (result?.user) return { user: result.user };
+    if (result?.id || result?.email) return { user: result };
+    if (result?.data?.id || result?.data?.email) return { user: result.data };
+    return result;
+  },
 
   logout: () =>
     apiCall("/api/logout", { method: "POST" }),
 
-  getUser: () =>
-    apiCall<UserProfile>("/api/auth/user"),
+  getUser: async () => {
+    const result = await apiCall<any>("/api/auth/user");
+    if (result?.id || result?.email) return result as UserProfile;
+    if (result?.user) return result.user as UserProfile;
+    if (result?.data) return result.data as UserProfile;
+    return result as UserProfile;
+  },
 
   updateUser: (data: Partial<UserProfile>) =>
     apiCall<UserProfile>("/api/auth/user", {
@@ -288,7 +298,7 @@ export const authApi = {
 };
 
 export const servicesApi = {
-  getAll: () => apiCall<Service[]>("/api/services"),
+  getAll: async () => unwrapList<Service>(await apiCall("/api/services")),
 };
 
 export interface Invoice {
@@ -333,9 +343,37 @@ export interface Reservation {
   updatedAt: string;
 }
 
+function unwrapList<T>(result: any): T[] {
+  if (Array.isArray(result)) return result;
+  if (result && typeof result === "object") {
+    const arr = result.data || result.results || result.items || result.rows || result.records;
+    if (Array.isArray(arr)) return arr;
+    for (const key of Object.keys(result)) {
+      if (Array.isArray(result[key]) && result[key].length > 0) {
+        return result[key];
+      }
+    }
+  }
+  return [];
+}
+
+function unwrapSingle<T>(result: any, idField?: string): T {
+  if (!result || typeof result !== "object") return result;
+  if (result.id || result._id) return result as T;
+  const inner = result.data || result.result || result.item || result.record;
+  if (inner && typeof inner === "object" && !Array.isArray(inner)) return inner as T;
+  for (const key of Object.keys(result)) {
+    const val = result[key];
+    if (val && typeof val === "object" && !Array.isArray(val) && (val.id || val._id)) {
+      return val as T;
+    }
+  }
+  return result as T;
+}
+
 export const quotesApi = {
-  getAll: () => apiCall<Quote[]>("/api/quotes"),
-  getById: (id: string) => apiCall<Quote>(`/api/quotes/${id}`),
+  getAll: async () => unwrapList<Quote>(await apiCall("/api/quotes")),
+  getById: async (id: string) => unwrapSingle<Quote>(await apiCall(`/api/quotes/${id}`)),
 
   create: (data: any) =>
     apiCall<Quote>("/api/quotes", {
@@ -387,19 +425,21 @@ export const quotesApi = {
 };
 
 export const invoicesApi = {
-  getAll: () => apiCall<Invoice[]>("/api/invoices"),
-  getById: (id: string) => apiCall<Invoice>(`/api/invoices/${id}`),
+  getAll: async () => unwrapList<Invoice>(await apiCall("/api/invoices")),
+  getById: async (id: string) => unwrapSingle<Invoice>(await apiCall(`/api/invoices/${id}`)),
 };
 
 export const reservationsApi = {
-  getAll: () => apiCall<Reservation[]>("/api/reservations"),
-  getById: (id: string) => apiCall<Reservation>(`/api/reservations/${id}`),
-  getServices: (id: string) => apiCall<any[]>(`/api/reservations/${id}/services`),
+  getAll: async () => unwrapList<Reservation>(await apiCall("/api/reservations")),
+  getById: async (id: string) => unwrapSingle<Reservation>(await apiCall(`/api/reservations/${id}`)),
+  getServices: async (id: string) => unwrapList<any>(await apiCall(`/api/reservations/${id}/services`)),
   create: (data: {
     quoteId?: string;
     serviceId?: string;
     scheduledDate: string;
+    date?: string;
     timeSlot: string;
+    time_slot?: string;
     notes?: string;
     vehicleInfo?: any;
   }) => apiCall<Reservation>("/api/reservations", { method: "POST", body: data }),
@@ -441,7 +481,7 @@ export interface ChatMessage {
 }
 
 export const notificationsApi = {
-  getAll: () => apiCall<Notification[]>("/api/notifications"),
+  getAll: async () => unwrapList<Notification>(await apiCall("/api/notifications")),
   markRead: (id: string) =>
     apiCall("/api/notifications/" + id + "/read", { method: "PATCH" }),
   markAllRead: () =>
@@ -449,9 +489,9 @@ export const notificationsApi = {
 };
 
 export const chatApi = {
-  getConversations: () => apiCall<ChatConversation[]>("/api/chat/conversations"),
-  getMessages: (conversationId: string) =>
-    apiCall<ChatMessage[]>(`/api/chat/conversations/${conversationId}/messages`),
+  getConversations: async () => unwrapList<ChatConversation>(await apiCall("/api/chat/conversations")),
+  getMessages: async (conversationId: string) =>
+    unwrapList<ChatMessage>(await apiCall(`/api/chat/conversations/${conversationId}/messages`)),
   sendMessage: (conversationId: string, content: string) =>
     apiCall<ChatMessage>(`/api/chat/conversations/${conversationId}/messages`, {
       method: "POST",

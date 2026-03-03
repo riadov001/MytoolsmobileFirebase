@@ -226,27 +226,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(response.status);
       const body = await response.arrayBuffer();
       const text = Buffer.from(body).toString("utf-8");
+      const fs = await import("fs");
       try {
         const parsed = JSON.parse(text);
         const debugEndpoints = ["/invoices", "/quotes", "/reservations", "/services", "/login", "/auth"];
         const shouldLog = debugEndpoints.some(ep => req.url === ep || req.url.startsWith(ep + "?") || req.url.startsWith(ep + "/"));
         if (shouldLog) {
+          const safeName = req.url.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 50);
+          const debugFile = `/tmp/api_debug_${req.method}_${safeName}.json`;
+          try { fs.writeFileSync(debugFile, JSON.stringify(parsed, null, 2).slice(0, 5000)); } catch {}
           if (Array.isArray(parsed) && parsed.length > 0) {
-            console.log(`[DEBUG] ${req.method} /api${req.url} => Array[${parsed.length}], first item keys:`, Object.keys(parsed[0]), "first item:", JSON.stringify(parsed[0]).slice(0, 1000));
+            console.log(`[DEBUG] ${req.method} /api${req.url} => Array[${parsed.length}], keys:`, Object.keys(parsed[0]), "sample:", JSON.stringify(parsed[0]).slice(0, 1500));
           } else if (parsed && typeof parsed === "object") {
-            const dataArr = parsed.data || parsed.results || parsed.items;
-            if (Array.isArray(dataArr) && dataArr.length > 0) {
-              console.log(`[DEBUG] ${req.method} /api${req.url} => wrapped, wrapper keys:`, Object.keys(parsed), "first item keys:", Object.keys(dataArr[0]), "first item:", JSON.stringify(dataArr[0]).slice(0, 1000));
-            } else {
-              console.log(`[DEBUG] ${req.method} /api${req.url} => Object keys:`, Object.keys(parsed), "sample:", JSON.stringify(parsed).slice(0, 1000));
-            }
+            console.log(`[DEBUG] ${req.method} /api${req.url} => Object keys:`, Object.keys(parsed), "full:", JSON.stringify(parsed).slice(0, 2000));
           }
         }
       } catch {
         if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-          console.log(`[DEBUG] ${req.method} /api${req.url} => HTML response (not JSON), status: ${response.status}, length: ${text.length}`);
-        } else {
-          console.log(`[DEBUG] ${req.method} /api${req.url} => non-JSON response:`, text.slice(0, 300));
+          console.log(`[DEBUG] ${req.method} /api${req.url} => HTML response (not JSON), status: ${response.status}`);
         }
       }
       res.send(Buffer.from(body));
