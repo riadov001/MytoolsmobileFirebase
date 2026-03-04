@@ -51,6 +51,17 @@ export default function MoreScreen() {
         <Text style={styles.headerTitle}>Plus</Text>
 
         <View style={styles.menuSection}>
+          <Text style={styles.sectionTitle}>Mon activité</Text>
+          <MenuItem
+            icon="list-outline"
+            title="Historique complet"
+            subtitle="Devis, factures et réservations"
+            onPress={() => router.push("/(main)/history")}
+            iconColor="#2563EB"
+          />
+        </View>
+
+        <View style={styles.menuSection}>
           <Text style={styles.sectionTitle}>Support</Text>
           <MenuItem
             icon="chatbubbles-outline"

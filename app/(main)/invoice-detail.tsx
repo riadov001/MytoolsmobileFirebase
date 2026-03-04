@@ -14,7 +14,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { invoicesApi, getBackendUrl } from "@/lib/api";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { invoicesApi, getBackendUrl, getSessionCookie } from "@/lib/api";
 import Colors from "@/constants/colors";
 import { useCustomAlert } from "@/components/CustomAlert";
 
@@ -65,6 +67,7 @@ export default function InvoiceDetailScreen() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { showAlert, AlertComponent } = useCustomAlert();
+  const [downloading, setDownloading] = React.useState(false);
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
     queryFn: async () => {
@@ -193,21 +196,39 @@ export default function InvoiceDetailScreen() {
   const handleDownloadPdf = async () => {
     const url = pdfUrl;
     if (!url) return;
-    showAlert({
-      type: "info",
-      title: "Télécharger la facture",
-      message: "Vous allez être redirigé vers votre espace personnel pour télécharger ce document. Souhaitez-vous continuer ?",
-      buttons: [
-        { text: "Annuler" },
-        {
-          text: "Continuer",
-          style: "primary",
-          onPress: async () => {
-            try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
-          },
-        },
-      ],
-    });
+    if (Platform.OS === "web") {
+      try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
+      return;
+    }
+    setDownloading(true);
+    try {
+      const cookie = getSessionCookie();
+      const filename = `facture-${id}-${Date.now()}.pdf`;
+      const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+      const result = await FileSystem.downloadAsync(url, fileUri, {
+        headers: cookie ? { Cookie: cookie } : {},
+      });
+      if (result.status !== 200) throw new Error(`Erreur ${result.status}`);
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (sharingAvailable) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "Facture PDF",
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err: any) {
+      showAlert({
+        type: "error",
+        title: "Erreur de téléchargement",
+        message: err?.message || "Impossible de télécharger la facture.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
 
@@ -374,11 +395,15 @@ export default function InvoiceDetailScreen() {
         {pdfUrl && (
           <View style={styles.footerActions}>
             <Pressable
-              style={({ pressed }) => [styles.btnPdf, pressed && styles.btnPdfPressed]}
+              style={({ pressed }) => [styles.btnPdf, pressed && styles.btnPdfPressed, downloading && { opacity: 0.6 }]}
               onPress={handleDownloadPdf}
+              disabled={downloading}
             >
-              <Ionicons name="download-outline" size={18} color={Colors.primary} />
-              <Text style={styles.btnPdfText}>Télécharger la facture</Text>
+              {downloading
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <Ionicons name="download-outline" size={18} color={Colors.primary} />
+              }
+              <Text style={styles.btnPdfText}>{downloading ? "Téléchargement…" : "Télécharger la facture"}</Text>
             </Pressable>
           </View>
         )}

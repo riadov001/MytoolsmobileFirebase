@@ -15,8 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as LocalAuthentication from "expo-local-authentication";
 import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
-import { authApi } from "@/lib/api";
+import { authApi, quotesApi, invoicesApi, reservationsApi } from "@/lib/api";
 import Colors from "@/constants/colors";
 import { FloatingSupport } from "@/components/FloatingSupport";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -48,6 +49,42 @@ export default function ProfileScreen() {
 
   const isPro = user?.role === "client_professionnel";
   const roleName = isPro ? "Professionnel" : "Particulier";
+
+  const { data: quotes = [] } = useQuery({ queryKey: ["quotes"], queryFn: quotesApi.getAll });
+  const { data: invoices = [] } = useQuery({ queryKey: ["invoices"], queryFn: invoicesApi.getAll });
+  const { data: reservations = [] } = useQuery({ queryKey: ["reservations"], queryFn: reservationsApi.getAll });
+
+  const quotesArr = Array.isArray(quotes) ? quotes : [];
+  const invoicesArr = Array.isArray(invoices) ? invoices : [];
+  const reservationsArr = Array.isArray(reservations) ? reservations : [];
+
+  const totalQuotes = quotesArr.length;
+  const acceptedQuotes = quotesArr.filter((q: any) => {
+    const s = (q.status || "").toLowerCase();
+    return s === "accepted" || s === "accepté" || s === "accepte" || s === "approved" || s === "approuvé";
+  }).length;
+
+  const totalInvoices = invoicesArr.length;
+  const paidInvoices = invoicesArr.filter((inv: any) => {
+    const s = (inv.status || "").toLowerCase();
+    return s === "paid" || s === "payée" || s === "payé";
+  }).length;
+
+  const totalReservations = reservationsArr.length;
+  const confirmedReservations = reservationsArr.filter((r: any) => {
+    const s = (r.status || "").toLowerCase();
+    return s === "confirmed" || s === "confirmée" || s === "confirmé" || s === "completed" || s === "terminé";
+  }).length;
+
+  const allItems = [
+    ...quotesArr.map((q: any) => q.createdAt),
+    ...invoicesArr.map((inv: any) => inv.createdAt),
+    ...reservationsArr.map((r: any) => r.createdAt),
+  ].filter(Boolean).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
+  const lastActivity = allItems[0]
+    ? new Date(allItems[0]).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    : null;
 
   useEffect(() => {
     checkBiometrics();
@@ -202,6 +239,32 @@ export default function ProfileScreen() {
 
         {activeSection === "info" && (
           <>
+            <View style={styles.statsCard}>
+              <Text style={styles.statsSectionTitle}>Mon activité</Text>
+              <View style={styles.statsGrid}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{totalQuotes}</Text>
+                  <Text style={styles.statLabel}>Devis</Text>
+                  {acceptedQuotes > 0 && <Text style={styles.statSub}>{acceptedQuotes} acceptés</Text>}
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{totalInvoices}</Text>
+                  <Text style={styles.statLabel}>Factures</Text>
+                  {paidInvoices > 0 && <Text style={styles.statSub}>{paidInvoices} payées</Text>}
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{totalReservations}</Text>
+                  <Text style={styles.statLabel}>RDV</Text>
+                  {confirmedReservations > 0 && <Text style={styles.statSub}>{confirmedReservations} confirmés</Text>}
+                </View>
+              </View>
+              {lastActivity && (
+                <Text style={styles.statsLastActivity}>Dernière activité : {lastActivity}</Text>
+              )}
+            </View>
+
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Informations personnelles</Text>
               {renderField("Email", user?.email || "", "mail-outline")}

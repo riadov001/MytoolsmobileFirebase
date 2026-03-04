@@ -15,7 +15,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as WebBrowser from "expo-web-browser";
 import * as Linking from "expo-linking";
-import { quotesApi, reservationsApi, getBackendUrl, Quote } from "@/lib/api";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import { quotesApi, reservationsApi, getBackendUrl, getSessionCookie, Quote } from "@/lib/api";
 import Colors from "@/constants/colors";
 import { useCustomAlert } from "@/components/CustomAlert";
 
@@ -82,6 +84,7 @@ export default function QuoteDetailScreen() {
   const { showAlert, AlertComponent } = useCustomAlert();
   const [accepting, setAccepting] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const { data: quote, isLoading } = useQuery({
     queryKey: ["quote", id],
@@ -210,21 +213,39 @@ export default function QuoteDetailScreen() {
   const handleDownloadPdf = async () => {
     const url = pdfUrl;
     if (!url) return;
-    showAlert({
-      type: "info",
-      title: "Télécharger le devis",
-      message: "Vous allez être redirigé vers votre espace personnel pour télécharger ce document. Souhaitez-vous continuer ?",
-      buttons: [
-        { text: "Annuler" },
-        {
-          text: "Continuer",
-          style: "primary",
-          onPress: async () => {
-            try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
-          },
-        },
-      ],
-    });
+    if (Platform.OS === "web") {
+      try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
+      return;
+    }
+    setDownloading(true);
+    try {
+      const cookie = getSessionCookie();
+      const filename = `devis-${id}-${Date.now()}.pdf`;
+      const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
+      const result = await FileSystem.downloadAsync(url, fileUri, {
+        headers: cookie ? { Cookie: cookie } : {},
+      });
+      if (result.status !== 200) throw new Error(`Erreur ${result.status}`);
+      const sharingAvailable = await Sharing.isAvailableAsync();
+      if (sharingAvailable) {
+        await Sharing.shareAsync(result.uri, {
+          mimeType: "application/pdf",
+          dialogTitle: "Devis PDF",
+          UTI: "com.adobe.pdf",
+        });
+      } else {
+        await WebBrowser.openBrowserAsync(url);
+      }
+    } catch (err: any) {
+      showAlert({
+        type: "error",
+        title: "Erreur de téléchargement",
+        message: err?.message || "Impossible de télécharger le devis.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   const handleAccept = async () => {
@@ -536,11 +557,15 @@ export default function QuoteDetailScreen() {
         <View style={styles.footerActions}>
           {pdfUrl && (
             <Pressable
-              style={({ pressed }) => [styles.btnSecondary, pressed && styles.btnSecondaryPressed]}
+              style={({ pressed }) => [styles.btnSecondary, pressed && styles.btnSecondaryPressed, downloading && { opacity: 0.6 }]}
               onPress={handleDownloadPdf}
+              disabled={downloading}
             >
-              <Ionicons name="download-outline" size={18} color={Colors.primary} />
-              <Text style={styles.btnSecondaryText}>Télécharger le devis</Text>
+              {downloading
+                ? <ActivityIndicator size="small" color={Colors.primary} />
+                : <Ionicons name="download-outline" size={18} color={Colors.primary} />
+              }
+              <Text style={styles.btnSecondaryText}>{downloading ? "Téléchargement…" : "Télécharger le devis"}</Text>
             </Pressable>
           )}
 

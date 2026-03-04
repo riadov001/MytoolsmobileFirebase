@@ -12,8 +12,8 @@ import {
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { reservationsApi, apiCall } from "@/lib/api";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { reservationsApi, quotesApi, apiCall } from "@/lib/api";
 import Colors from "@/constants/colors";
 import { useCustomAlert } from "@/components/CustomAlert";
 
@@ -241,6 +241,17 @@ export default function RequestReservationScreen() {
 
   const isModification = !!modifyReservationId;
 
+  const { data: allQuotes = [], isLoading: loadingQuotes } = useQuery({
+    queryKey: ["quotes"],
+    queryFn: quotesApi.getAll,
+    enabled: !quoteId && !isModification,
+  });
+
+  const hasAcceptedQuote = quoteId || isModification || (Array.isArray(allQuotes) && allQuotes.some((q: any) => {
+    const s = (q.status || "").toLowerCase();
+    return s === "accepted" || s === "accepté" || s === "accepte" || s === "approved" || s === "approuvé" || s === "approuve";
+  }));
+
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -333,6 +344,45 @@ export default function RequestReservationScreen() {
       ],
     });
   };
+
+  if (!isModification && !quoteId && loadingQuotes) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  if (!hasAcceptedQuote) {
+    return (
+      <View style={styles.container}>
+        <View style={[styles.header, { paddingTop: Platform.OS === "web" ? 67 + 8 : insets.top + 8 }]}>
+          <Pressable onPress={() => router.back()} style={styles.headerBtn}>
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </Pressable>
+          <Text style={styles.headerTitle}>Demande de réservation</Text>
+          <View style={styles.headerBtn} />
+        </View>
+        <View style={styles.gateContainer}>
+          <View style={styles.gateIconWrapper}>
+            <Ionicons name="document-text-outline" size={56} color={Colors.textTertiary} />
+          </View>
+          <Text style={styles.gateTitle}>Devis accepté requis</Text>
+          <Text style={styles.gateSubtitle}>
+            Vous devez d'abord avoir un devis accepté pour prendre rendez-vous.
+          </Text>
+          <Pressable
+            style={({ pressed }) => [styles.gateBtn, pressed && { opacity: 0.8 }]}
+            onPress={() => router.push("/(main)/(tabs)/quotes")}
+          >
+            <Ionicons name="document-text-outline" size={18} color="#fff" />
+            <Text style={styles.gateBtnText}>Voir mes devis</Text>
+          </Pressable>
+        </View>
+        {AlertComponent}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -620,6 +670,52 @@ const styles = StyleSheet.create({
   submitBtnText: {
     color: "#fff",
     fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+  gateContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+    gap: 16,
+  },
+  gateIconWrapper: {
+    width: 96,
+    height: 96,
+    borderRadius: 24,
+    backgroundColor: Colors.surface,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginBottom: 8,
+  },
+  gateTitle: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    textAlign: "center",
+  },
+  gateSubtitle: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  gateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  gateBtnText: {
+    color: "#fff",
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
 });
