@@ -69,6 +69,16 @@ function getAuthHeaders(req: Request): Record<string, string> {
   return headers;
 }
 
+function forwardSetCookie(externalRes: globalThis.Response, expressRes: Response) {
+  const setCookie = externalRes.headers.get("set-cookie");
+  if (setCookie) {
+    const parts = setCookie.split(",").map(c => c.trim());
+    for (const part of parts) {
+      expressRes.appendHeader("set-cookie", part);
+    }
+  }
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   await initDatabase();
 
@@ -478,21 +488,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const r = await fetch(`${EXTERNAL_API}/invoices${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(r.status >= 400 ? r.status : 401).json({ message: "Non authentifié" });
       }
       let data: any;
-      try {
-        data = JSON.parse(text);
-      } catch {
-        return res.status(200).json([]);
-      }
-
-      // Ensure data includes line items if they are missing but available in a detail call pattern
-      // Some APIs return summary in list and details in getById. 
-      // We'll keep the data as is but the frontend needs to handle it.
-
+      try { data = JSON.parse(text); } catch { return res.status(200).json([]); }
       console.log(`[PROXY] GET /api/invoices => ${r.status}`);
       return res.status(r.status).json(data);
     } catch (err: any) {
@@ -505,16 +507,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { id } = req.params;
     const headers = getAuthHeaders(req);
     try {
-      const r = await fetch(`${EXTERNAL_API}/invoices/${id}`, {
+      const r = await fetch(`${EXTERNAL_API}/invoices`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(401).json({ message: "Non authentifié" });
       }
-      const parsed = JSON.parse(text);
-      console.log(`[PROXY] GET /api/invoices/${id} => ${r.status}, keys: ${Object.keys(parsed)}, data: ${text.substring(0, 1000)}`);
-      return res.status(r.status).json(parsed);
+      let data: any;
+      try { data = JSON.parse(text); } catch { return res.status(404).json({ message: "Facture introuvable" }); }
+      const list = Array.isArray(data) ? data : (data?.data || data?.invoices || data?.results || []);
+      const item = list.find((inv: any) => String(inv.id || inv._id) === id);
+      if (!item) {
+        console.log(`[PROXY] GET /api/invoices/${id} => not found in list of ${list.length}`);
+        return res.status(404).json({ message: "Facture introuvable" });
+      }
+      console.log(`[PROXY] GET /api/invoices/${id} => found, keys: ${Object.keys(item)}`);
+      return res.status(200).json(item);
     } catch (err: any) {
       console.error(`[INVOICE ${id}] error:`, err.message);
       return res.status(502).json({ message: "Erreur de connexion" });
@@ -524,31 +534,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/quotes/:id", async (req: Request, res: Response) => {
     const { id } = req.params;
     const headers = getAuthHeaders(req);
-    const userCookie = req.headers["cookie"] || "";
     try {
-      const r = await fetch(`${EXTERNAL_API}/quotes/${id}`, {
+      const r = await fetch(`${EXTERNAL_API}/quotes`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(401).json({ message: "Non authentifié" });
       }
       let data: any;
-      try { data = JSON.parse(text); } catch { return res.status(200).json({}); }
+      try { data = JSON.parse(text); } catch { return res.status(404).json({ message: "Devis introuvable" }); }
+      const list = Array.isArray(data) ? data : (data?.data || data?.quotes || data?.results || []);
+      const item = list.find((q: any) => String(q.id || q._id) === id);
+      if (!item) {
+        console.log(`[PROXY] GET /api/quotes/${id} => not found in list of ${list.length}`);
+        return res.status(404).json({ message: "Devis introuvable" });
+      }
       try {
         const localRes = await pool.query(
           "SELECT action FROM quote_responses WHERE quote_id = $1 ORDER BY created_at DESC LIMIT 1",
           [id]
         );
         if (localRes.rows.length > 0) {
-          if (data && typeof data === "object") {
-            const inner = data.data || data.quote || data;
-            inner.status = localRes.rows[0].action;
-          }
+          item.status = localRes.rows[0].action;
         }
       } catch {}
-      console.log(`[PROXY] GET /api/quotes/${id} => ${r.status}`);
-      return res.status(r.status).json(data);
+      console.log(`[PROXY] GET /api/quotes/${id} => found`);
+      return res.status(200).json(item);
     } catch (err: any) {
       console.error(`[QUOTE ${id}] error:`, err.message);
       return res.status(502).json({ message: "Erreur de connexion" });
@@ -559,29 +572,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { id } = req.params;
     const headers = getAuthHeaders(req);
     try {
-      const r = await fetch(`${EXTERNAL_API}/reservations/${id}`, {
+      const r = await fetch(`${EXTERNAL_API}/reservations`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(401).json({ message: "Non authentifié" });
       }
       let data: any;
-      try { data = JSON.parse(text); } catch { return res.status(200).json({}); }
+      try { data = JSON.parse(text); } catch { return res.status(404).json({ message: "Réservation introuvable" }); }
+      const list = Array.isArray(data) ? data : (data?.data || data?.reservations || data?.results || []);
+      const item = list.find((r: any) => String(r.id || r._id) === id);
+      if (!item) {
+        console.log(`[PROXY] GET /api/reservations/${id} => not found in list of ${list.length}`);
+        return res.status(404).json({ message: "Réservation introuvable" });
+      }
       try {
         const localRes = await pool.query(
           "SELECT action FROM reservation_confirmations WHERE reservation_id = $1 ORDER BY created_at DESC LIMIT 1",
           [id]
         );
         if (localRes.rows.length > 0) {
-          if (data && typeof data === "object") {
-            const inner = data.data || data.reservation || data;
-            inner.status = localRes.rows[0].action;
-          }
+          item.status = localRes.rows[0].action;
         }
       } catch {}
-      console.log(`[PROXY] GET /api/reservations/${id} => ${r.status}`);
-      return res.status(r.status).json(data);
+      console.log(`[PROXY] GET /api/reservations/${id} => found`);
+      return res.status(200).json(item);
     } catch (err: any) {
       console.error(`[RESERVATION ${id}] error:`, err.message);
       return res.status(502).json({ message: "Erreur de connexion" });
@@ -595,9 +612,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const r = await fetch(`${EXTERNAL_API}/quotes${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(r.status >= 400 ? r.status : 401).json({ message: "Non authentifié" });
       }
       let data: any;
       try { data = JSON.parse(text); } catch { return res.status(200).json([]); }
@@ -750,9 +768,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const r = await fetch(`${EXTERNAL_API}/reservations${req.url.includes("?") ? req.url.substring(req.url.indexOf("?")) : ""}`, {
         method: "GET", headers, redirect: "manual",
       });
+      forwardSetCookie(r, res);
       const text = await r.text();
       if (text.includes("<!DOCTYPE") || text.includes("<html")) {
-        return res.status(r.status >= 400 ? r.status : 404).json({ message: "Endpoint non trouvé" });
+        return res.status(r.status >= 400 ? r.status : 401).json({ message: "Non authentifié" });
       }
       let data: any;
       try { data = JSON.parse(text); } catch { return res.status(200).json([]); }

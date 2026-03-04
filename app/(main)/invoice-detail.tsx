@@ -71,30 +71,17 @@ export default function InvoiceDetailScreen() {
   const { data: invoice, isLoading } = useQuery({
     queryKey: ["invoice", id],
     queryFn: async () => {
-      let detail: any = null;
       try {
-        detail = await invoicesApi.getById(id!);
-        console.log("[INVOICE FETCH] getById result:", JSON.stringify(detail).substring(0, 2000));
-      } catch (e: any) {
-        console.log("[INVOICE FETCH] getById failed:", e?.message);
-      }
-      if (detail && (detail.id || detail._id)) {
-        const allKeys = Object.keys(detail);
-        console.log("[INVOICE FETCH] detail keys:", allKeys);
-        for (const key of allKeys) {
-          if (Array.isArray(detail[key]) && detail[key].length > 0) {
-            console.log(`[INVOICE FETCH] array key "${key}" length=${detail[key].length}, sample:`, JSON.stringify(detail[key][0]).substring(0, 500));
-          }
-        }
-        return detail;
-      }
-      const all = await invoicesApi.getAll();
-      const list = Array.isArray(all) ? all : [];
-      const found = list.find((inv) => inv.id === id) || null;
-      if (found) {
-        console.log("[INVOICE FETCH] from list, keys:", Object.keys(found));
-      }
-      return found;
+        const detail = await invoicesApi.getById(id!);
+        if (detail && (detail.id || (detail as any)._id)) return detail;
+      } catch {}
+      try {
+        const all = await invoicesApi.getAll();
+        const list = Array.isArray(all) ? all : [];
+        const found = list.find((inv: any) => String(inv.id || inv._id) === id);
+        if (found) return found;
+      } catch {}
+      return null;
     },
     enabled: !!id,
     retry: 1,

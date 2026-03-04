@@ -91,11 +91,20 @@ export default function QuoteDetailScreen() {
     queryFn: async () => {
       try {
         const detail = await quotesApi.getById(id!);
-        if (detail && detail.id) return detail;
+        if (detail && (detail.id || (detail as any)._id)) return detail;
       } catch {}
-      const all = await quotesApi.getAll();
-      const list = Array.isArray(all) ? all : [];
-      return list.find((q) => q.id === id) || null;
+      try {
+        const all = await quotesApi.getAll();
+        const list = Array.isArray(all) ? all : [];
+        const found = list.find((q) => String(q.id || (q as any)._id) === id);
+        if (found) return found;
+      } catch {}
+      const cached = queryClient.getQueryData<Quote[]>(["quotes"]);
+      if (cached) {
+        const found = cached.find((q) => String(q.id || (q as any)._id) === id);
+        if (found) return found;
+      }
+      return null;
     },
     enabled: !!id,
   });

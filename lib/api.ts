@@ -109,12 +109,7 @@ export async function apiCall<T = any>(
     if (sessionCookieValue) {
       const cookiePart = sessionCookieValue.split(";")[0];
       sessionCookie = cookiePart;
-    } else {
-      // Fallback if the cookie name doesn't match expected patterns but we want to capture it
-      const cookiePart = setCookie.split(";")[0];
-      sessionCookie = cookiePart;
     }
-
   }
 
   if (!res.ok) {
