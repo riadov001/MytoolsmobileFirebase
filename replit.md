@@ -5,12 +5,12 @@ Application mobile Expo React Native pour MyJantes, un service professionnel de 
 
 ## Architecture
 - **Frontend**: Expo React Native (Expo Router, file-based routing)
-- **Backend**: API externe hébergée sur `appmyjantes2.mytoolsgroup.eu`
+- **Backend**: API externe hébergée sur `Saas.mytoolsgroup.eu`
 - **Auth**: Sessions avec cookies (stockés via expo-secure-store / AsyncStorage)
 - **State**: React Query pour les données serveur, React Context pour l'auth
 
 ## API Backend
-Base URL: Configurable via `EXTERNAL_API_URL` env var (default: `https://appmyjantes2.mytoolsgroup.eu/api`)
+Base URL: Configurable via `EXTERNAL_API_URL` env var (default: `https://Saas.mytoolsgroup.eu/api`)
 
 ### Endpoints principaux
 - `POST /api/register` - Inscription (email, password, firstName, lastName, role, etc.)
@@ -88,7 +88,7 @@ server/
 - Account deletion available via Profile → Paramètres → Supprimer mon compte
 - Detail pages use client API endpoints only
 - Biometric auth auto-clears expired session credentials
-- All domain references point to `appmyjantes2.mytoolsgroup.eu`
+- All domain references point to `Saas.mytoolsgroup.eu`
 - Data auto-refreshes: quotes every 30s, invoices/reservations every 60s, notifications every 30s
 
 ## Apple App Store Compliance (5.1.1(v))
@@ -145,7 +145,7 @@ server/
 - Mar 3 2026: Quote accept/reject with multi-endpoint fallbacks
 - Mar 3 2026: Invoice/quote amount field name fallbacks (camelCase + snake_case)
 - Mar 3 2026: Server proxy debug logging to /tmp/api_debug_*.json
-- Mar 4 2026: Backend URL switched to appmyjantes2.mytoolsgroup.eu
+- Mar 4 2026: Backend URL switched to Saas.mytoolsgroup.eu
 - Mar 4 2026: Removed all non-functional buttons (image attach, Modifier, Annuler, Refuser)
 - Mar 4 2026: Removed uploadApi and sendMessageWithImage from lib/api.ts
 - Mar 4 2026: Auto-refresh polling added (quotes 30s, invoices/reservations 60s)
