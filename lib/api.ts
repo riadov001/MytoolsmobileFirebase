@@ -33,6 +33,8 @@ export function setSessionCookie(cookie: string | null) {
   if (cookie) {
     if (cookie.includes("myjantes.sid") || cookie.includes("connect.sid")) {
       sessionCookie = cookie.split(";")[0];
+    } else if (cookie.includes("=")) {
+      sessionCookie = cookie.split(";")[0];
     } else {
       sessionCookie = `myjantes.sid=${cookie}`;
     }
