@@ -40,6 +40,7 @@ function RootLayoutNav() {
       <Stack.Screen name="privacy" options={{ presentation: "modal", headerShown: true, title: "Politique de Confidentialité" }} />
       <Stack.Screen name="onboarding" options={{ presentation: "modal", headerShown: false }} />
       <Stack.Screen name="support" options={{ presentation: "formSheet", sheetAllowedDetents: [0.75], sheetGrabberVisible: true, headerShown: false }} />
+      <Stack.Screen name="consent" options={{ headerShown: false, animation: "fade", gestureEnabled: false }} />
     </Stack>
   );
 }
@@ -50,7 +51,7 @@ function SplashView() {
     <View style={[styles.splashContainer, { backgroundColor: theme.background }]}>
       <View style={styles.logoWrapper}>
         <Image
-          source={require("@/assets/images/logo_rounded.png")}
+          source={require("@/assets/images/logo_new.png")}
           style={styles.splashLogo}
           contentFit="contain"
         />

@@ -13,11 +13,9 @@ import { useAuth } from "@/lib/auth-context";
 import { authApi, quotesApi, invoicesApi, reservationsApi } from "@/lib/api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
-import { FloatingSupport } from "@/components/FloatingSupport";
 import { useCustomAlert } from "@/components/CustomAlert";
 
 const WEB_PORTAL_URL = "https://apps.mytoolsgroup.eu";
-const SECURITY_MESSAGE = "Pour des raisons de sécurité, cette action est disponible uniquement depuis votre espace client sécurisé accessible via notre site internet.";
 
 async function getStoredValue(key: string): Promise<string | null> {
   if (Platform.OS === "web") return AsyncStorage.getItem(key);
@@ -28,6 +26,43 @@ async function setStoredValue(key: string, value: string) {
   else await SecureStore.setItemAsync(key, value);
 }
 
+function SettingsRow({
+  icon, iconBg, iconColor, label, sub, onPress, right, danger = false, showDivider = true,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconBg: string;
+  iconColor: string;
+  label: string;
+  sub?: string;
+  onPress?: () => void;
+  right?: React.ReactNode;
+  danger?: boolean;
+  showDivider?: boolean;
+}) {
+  const theme = useTheme();
+  const styles = useMemo(() => getStyles(theme), [theme]);
+  return (
+    <>
+      <Pressable
+        style={({ pressed }) => [styles.row, pressed && onPress && { backgroundColor: theme.surfaceSecondary }]}
+        onPress={onPress}
+      >
+        <View style={[styles.rowIcon, { backgroundColor: iconBg }]}>
+          <Ionicons name={icon} size={20} color={iconColor} />
+        </View>
+        <View style={styles.rowContent}>
+          <Text style={[styles.rowLabel, danger && { color: "#EF4444" }]}>{label}</Text>
+          {sub ? <Text style={styles.rowSub}>{sub}</Text> : null}
+        </View>
+        {right !== undefined ? right : (
+          onPress ? <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} /> : null
+        )}
+      </Pressable>
+      {showDivider && <View style={styles.inGroupDivider} />}
+    </>
+  );
+}
+
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout } = useAuth();
@@ -35,15 +70,15 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
 
-  const [activeSection, setActiveSection] = useState<"info" | "security" | "notifications">("info");
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [biometricType, setBiometricType] = useState("");
+  const [biometricType, setBiometricType] = useState("Biométrie");
   const [pushEnabled, setPushEnabled] = useState(true);
   const [emailNotifEnabled, setEmailNotifEnabled] = useState(true);
 
   const isPro = user?.role === "client_professionnel";
-  const roleName = isPro ? "Professionnel" : "Particulier";
+  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
+  const displayName = user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email || "";
 
   const { data: quotes = [] } = useQuery({ queryKey: ["quotes"], queryFn: quotesApi.getAll });
   const { data: invoices = [] } = useQuery({ queryKey: ["invoices"], queryFn: invoicesApi.getAll });
@@ -52,28 +87,6 @@ export default function ProfileScreen() {
   const quotesArr = Array.isArray(quotes) ? quotes : [];
   const invoicesArr = Array.isArray(invoices) ? invoices : [];
   const reservationsArr = Array.isArray(reservations) ? reservations : [];
-
-  const totalQuotes = quotesArr.length;
-  const acceptedQuotes = quotesArr.filter((q: any) => {
-    const s = (q.status || "").toLowerCase();
-    return s === "accepted" || s === "accepté" || s === "accepte" || s === "approved" || s === "approuvé";
-  }).length;
-  const totalInvoices = invoicesArr.length;
-  const paidInvoices = invoicesArr.filter((inv: any) => ["paid", "payée", "payé"].includes((inv.status || "").toLowerCase())).length;
-  const totalReservations = reservationsArr.length;
-  const confirmedReservations = reservationsArr.filter((r: any) => {
-    const s = (r.status || "").toLowerCase();
-    return s === "confirmed" || s === "confirmée" || s === "confirmé" || s === "completed" || s === "terminé";
-  }).length;
-
-  const allItems = [
-    ...quotesArr.map((q: any) => q.createdAt),
-    ...invoicesArr.map((inv: any) => inv.createdAt),
-    ...reservationsArr.map((r: any) => r.createdAt),
-  ].filter(Boolean).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
-  const lastActivity = allItems[0]
-    ? new Date(allItems[0]).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
-    : null;
 
   useEffect(() => { checkBiometrics(); loadNotificationPreferences(); }, []);
 
@@ -87,7 +100,6 @@ export default function ProfileScreen() {
         const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
         if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) setBiometricType("Face ID");
         else if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) setBiometricType("Empreinte digitale");
-        else if (types.includes(LocalAuthentication.AuthenticationType.IRIS)) setBiometricType("Iris");
       }
       const stored = await getStoredValue("biometric_enabled");
       setBiometricEnabled(stored === "true");
@@ -108,11 +120,10 @@ export default function ProfileScreen() {
 
   const toggleBiometric = async (value: boolean) => {
     if (value) {
-      const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Activez l'authentification biométrique", cancelLabel: "Annuler", disableDeviceFallback: false });
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: `Activer ${biometricType}`, cancelLabel: "Annuler", disableDeviceFallback: false });
       if (result.success) {
         setBiometricEnabled(true);
         await setStoredValue("biometric_enabled", "true");
-        showAlert({ type: "success", title: "Activé", message: `${biometricType || "Biométrie"} activé(e) pour la connexion.`, buttons: [{ text: "OK", style: "primary" }] });
       }
     } else {
       setBiometricEnabled(false);
@@ -140,370 +151,235 @@ export default function ProfileScreen() {
     });
   };
 
-  const renderField = (label: string, value: string, icon: keyof typeof Ionicons.glyphMap) => (
-    <View style={styles.fieldContainer}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.fieldValueRow}>
-        <Ionicons name={icon} size={18} color={theme.textSecondary} />
-        <Text style={[styles.fieldValue, !value && styles.fieldValueEmpty]}>{value || "Non renseigné"}</Text>
-      </View>
-    </View>
-  );
-
-  const initials = [user?.firstName?.[0], user?.lastName?.[0]].filter(Boolean).join("").toUpperCase() || user?.email?.[0]?.toUpperCase() || "?";
-
-  const TabButton = ({ id, label, icon }: { id: "info" | "security" | "notifications"; label: string; icon: keyof typeof Ionicons.glyphMap }) => (
-    <Pressable style={[styles.tabBtn, activeSection === id && styles.tabBtnActive]} onPress={() => setActiveSection(id)}>
-      <Ionicons name={icon} size={18} color={activeSection === id ? theme.primary : theme.textSecondary} />
-      <Text style={[styles.tabBtnText, activeSection === id && styles.tabBtnTextActive]}>{label}</Text>
-    </Pressable>
-  );
+  const topPadding = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
+  const bottomPadding = Platform.OS === "web" ? 34 + 100 : insets.bottom + 100;
 
   return (
     <View style={styles.container}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, {
-          paddingTop: Platform.OS === "web" ? 67 + 16 : insets.top + 16,
-          paddingBottom: Platform.OS === "web" ? 34 + 100 : insets.bottom + 100,
-        }]}
+        contentContainerStyle={[styles.scroll, { paddingTop: topPadding, paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.headerTitle}>Mon Profil</Text>
-
         <View style={styles.avatarSection}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+          <View style={styles.avatarRing}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
           </View>
-          <Text style={styles.avatarName}>
-            {user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : user?.email}
-          </Text>
-          <View style={styles.roleBadge}>
-            <Text style={styles.roleText}>{roleName}</Text>
+          <Text style={styles.avatarName}>{displayName}</Text>
+          <Text style={styles.avatarEmail}>{user?.email || ""}</Text>
+          <View style={styles.rolePill}>
+            <View style={[styles.roleDot, { backgroundColor: isPro ? "#F59E0B" : theme.primary }]} />
+            <Text style={styles.roleText}>{isPro ? "Professionnel" : "Particulier"}</Text>
           </View>
         </View>
 
-        <View style={styles.tabRow}>
-          <TabButton id="info" label="Infos" icon="person-outline" />
-          <TabButton id="security" label="Sécurité" icon="shield-checkmark-outline" />
-          <TabButton id="notifications" label="Notifs" icon="notifications-outline" />
+        <View style={styles.statsRow}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNum}>{quotesArr.length}</Text>
+            <Text style={styles.statLbl}>Devis</Text>
+          </View>
+          <View style={styles.statSep} />
+          <View style={styles.statBox}>
+            <Text style={styles.statNum}>{invoicesArr.length}</Text>
+            <Text style={styles.statLbl}>Factures</Text>
+          </View>
+          <View style={styles.statSep} />
+          <View style={styles.statBox}>
+            <Text style={styles.statNum}>{reservationsArr.length}</Text>
+            <Text style={styles.statLbl}>RDV</Text>
+          </View>
         </View>
 
-        {activeSection === "info" && (
+        <Text style={styles.groupLabel}>Compte</Text>
+        <View style={styles.group}>
+          <SettingsRow icon="mail-outline" iconBg="#3B82F620" iconColor="#3B82F6" label="Email" sub={user?.email || "Non renseigné"} showDivider />
+          <SettingsRow icon="person-outline" iconBg="#8B5CF620" iconColor="#8B5CF6" label="Nom complet" sub={displayName || "Non renseigné"} showDivider />
+          <SettingsRow icon="call-outline" iconBg="#22C55E20" iconColor="#22C55E" label="Téléphone" sub={user?.phone || "Non renseigné"} showDivider />
+          <SettingsRow icon="location-outline" iconBg="#F59E0B20" iconColor="#F59E0B" label="Ville" sub={[user?.city, user?.postalCode].filter(Boolean).join(", ") || "Non renseigné"} showDivider={false} />
+        </View>
+
+        {isPro && (
           <>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsSectionTitle}>Mon activité</Text>
-              <View style={styles.statsGrid}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{totalQuotes}</Text>
-                  <Text style={styles.statLabel}>Devis</Text>
-                  {acceptedQuotes > 0 && <Text style={styles.statSub}>{acceptedQuotes} acceptés</Text>}
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{totalInvoices}</Text>
-                  <Text style={styles.statLabel}>Factures</Text>
-                  {paidInvoices > 0 && <Text style={styles.statSub}>{paidInvoices} payées</Text>}
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{totalReservations}</Text>
-                  <Text style={styles.statLabel}>RDV</Text>
-                  {confirmedReservations > 0 && <Text style={styles.statSub}>{confirmedReservations} confirmés</Text>}
-                </View>
-              </View>
-              {lastActivity && <Text style={styles.statsLastActivity}>Dernière activité : {lastActivity}</Text>}
-            </View>
-
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Informations personnelles</Text>
-              {renderField("Email", user?.email || "", "mail-outline")}
-              {renderField("Prénom", user?.firstName || "", "person-outline")}
-              {renderField("Nom", user?.lastName || "", "person-outline")}
-              {renderField("Téléphone", user?.phone || "", "call-outline")}
-              {renderField("Adresse", user?.address || "", "location-outline")}
-              {renderField("Code postal", user?.postalCode || "", "navigate-outline")}
-              {renderField("Ville", user?.city || "", "business-outline")}
-            </View>
-
-            {isPro && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Informations société</Text>
-                {renderField("Nom entreprise", user?.companyName || "", "business-outline")}
-                {renderField("SIRET", user?.siret || "", "document-text-outline")}
-                {renderField("N° TVA", user?.tvaNumber || "", "receipt-outline")}
-                {renderField("Adresse société", user?.companyAddress || "", "location-outline")}
-                {renderField("CP société", user?.companyPostalCode || "", "navigate-outline")}
-                {renderField("Ville société", user?.companyCity || "", "business-outline")}
-                {renderField("Pays société", user?.companyCountry || "", "globe-outline")}
-              </View>
-            )}
-
-            <View style={styles.webPortalCard}>
-              <View style={styles.webPortalIconContainer}>
-                <Ionicons name="information-circle" size={24} color={theme.primary} />
-              </View>
-              <Text style={styles.webPortalMessage}>{SECURITY_MESSAGE}</Text>
-              <Pressable
-                style={({ pressed }) => [styles.webPortalBtn, pressed && { opacity: 0.8 }]}
-                onPress={() => Linking.openURL(WEB_PORTAL_URL)}
-              >
-                <Ionicons name="open-outline" size={18} color="#fff" />
-                <Text style={styles.webPortalBtnText}>Accéder à l'espace client</Text>
-              </Pressable>
+            <Text style={styles.groupLabel}>Société</Text>
+            <View style={styles.group}>
+              <SettingsRow icon="business-outline" iconBg="#EC489920" iconColor="#EC4899" label="Entreprise" sub={user?.companyName || "Non renseigné"} showDivider />
+              <SettingsRow icon="document-text-outline" iconBg="#6366F120" iconColor="#6366F1" label="SIRET" sub={user?.siret || "Non renseigné"} showDivider />
+              <SettingsRow icon="receipt-outline" iconBg="#14B8A620" iconColor="#14B8A6" label="N° TVA" sub={user?.tvaNumber || "Non renseigné"} showDivider={false} />
             </View>
           </>
         )}
 
-        {activeSection === "security" && (
-          <>
-            {Platform.OS !== "web" && biometricAvailable && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Authentification forte</Text>
-                <View style={styles.settingRow}>
-                  <View style={styles.settingInfo}>
-                    <View style={[styles.settingIconContainer, { backgroundColor: "#3B82F620" }]}>
-                      <Ionicons name="finger-print" size={22} color="#3B82F6" />
-                    </View>
-                    <View style={styles.settingTextContainer}>
-                      <Text style={styles.settingTitle}>{biometricType || "Biométrie"}</Text>
-                      <Text style={styles.settingDesc}>Connexion rapide et sécurisée</Text>
-                    </View>
-                  </View>
-                  <Switch
-                    value={biometricEnabled}
-                    onValueChange={toggleBiometric}
-                    trackColor={{ false: theme.surfaceSecondary, true: theme.primary + "60" }}
-                    thumbColor={biometricEnabled ? theme.primary : theme.textTertiary}
-                  />
-                </View>
-              </View>
-            )}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Mot de passe</Text>
-              <View style={styles.webPortalCard}>
-                <View style={styles.webPortalIconContainer}>
-                  <Ionicons name="lock-closed" size={24} color={theme.primary} />
-                </View>
-                <Text style={styles.webPortalMessage}>{SECURITY_MESSAGE}</Text>
-                <Pressable
-                  style={({ pressed }) => [styles.webPortalBtn, pressed && { opacity: 0.8 }]}
-                  onPress={() => Linking.openURL(WEB_PORTAL_URL)}
-                >
-                  <Ionicons name="open-outline" size={18} color="#fff" />
-                  <Text style={styles.webPortalBtnText}>Modifier sur le site</Text>
-                </Pressable>
-              </View>
-            </View>
-          </>
-        )}
+        <Pressable
+          style={({ pressed }) => [styles.portalBtn, pressed && { opacity: 0.85 }]}
+          onPress={() => Linking.openURL(WEB_PORTAL_URL)}
+        >
+          <Ionicons name="open-outline" size={16} color="#fff" />
+          <Text style={styles.portalBtnText}>Modifier mes informations sur l'espace client</Text>
+        </Pressable>
 
-        {activeSection === "notifications" && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Préférences de notification</Text>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <View style={[styles.settingIconContainer, { backgroundColor: theme.primary + "20" }]}>
-                  <Ionicons name="notifications" size={20} color={theme.primary} />
-                </View>
-                <View style={styles.settingTextContainer}>
-                  <Text style={styles.settingTitle}>Notifications push</Text>
-                  <Text style={styles.settingDesc}>Alertes sur votre téléphone</Text>
-                </View>
-              </View>
+        <Text style={styles.groupLabel}>Sécurité</Text>
+        <View style={styles.group}>
+          {Platform.OS !== "web" && biometricAvailable && (
+            <SettingsRow
+              icon="finger-print" iconBg="#3B82F620" iconColor="#3B82F6"
+              label={biometricType} sub="Connexion rapide et sécurisée"
+              right={
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={toggleBiometric}
+                  trackColor={{ false: theme.border, true: theme.primary + "80" }}
+                  thumbColor={biometricEnabled ? theme.primary : theme.textTertiary}
+                  ios_backgroundColor={theme.border}
+                />
+              }
+              showDivider
+            />
+          )}
+          <SettingsRow
+            icon="lock-closed-outline" iconBg="#EF444420" iconColor="#EF4444"
+            label="Modifier le mot de passe"
+            sub="Via votre espace client en ligne"
+            onPress={() => Linking.openURL(WEB_PORTAL_URL)}
+            showDivider={false}
+          />
+        </View>
+
+        <Text style={styles.groupLabel}>Notifications</Text>
+        <View style={styles.group}>
+          <SettingsRow
+            icon="notifications-outline" iconBg={theme.primary + "20"} iconColor={theme.primary}
+            label="Notifications push" sub="Alertes en temps réel"
+            right={
               <Switch
                 value={pushEnabled}
                 onValueChange={(v) => updateNotifPref("push", v)}
-                trackColor={{ false: theme.surfaceSecondary, true: theme.primary + "60" }}
+                trackColor={{ false: theme.border, true: theme.primary + "80" }}
                 thumbColor={pushEnabled ? theme.primary : theme.textTertiary}
+                ios_backgroundColor={theme.border}
               />
-            </View>
-            <View style={styles.settingRow}>
-              <View style={styles.settingInfo}>
-                <View style={[styles.settingIconContainer, { backgroundColor: "#10B98120" }]}>
-                  <Ionicons name="mail" size={20} color="#10B981" />
-                </View>
-                <View style={styles.settingTextContainer}>
-                  <Text style={styles.settingTitle}>Notifications email</Text>
-                  <Text style={styles.settingDesc}>Récapitulatifs et suivis par email</Text>
-                </View>
-              </View>
+            }
+            showDivider
+          />
+          <SettingsRow
+            icon="mail-outline" iconBg="#10B98120" iconColor="#10B981"
+            label="Notifications email" sub="Récapitulatifs par email"
+            right={
               <Switch
                 value={emailNotifEnabled}
                 onValueChange={(v) => updateNotifPref("email", v)}
-                trackColor={{ false: theme.surfaceSecondary, true: "#10B98160" }}
+                trackColor={{ false: theme.border, true: "#10B98180" }}
                 thumbColor={emailNotifEnabled ? "#10B981" : theme.textTertiary}
+                ios_backgroundColor={theme.border}
               />
-            </View>
-            <View style={styles.notifInfoBox}>
-              <Ionicons name="information-circle-outline" size={18} color={theme.textSecondary} />
-              <Text style={styles.notifInfoText}>
-                Les notifications push requièrent l'autorisation sur votre appareil. Les emails sont envoyés pour les événements importants (devis, facture, rendez-vous).
-              </Text>
-            </View>
-          </View>
-        )}
+            }
+            showDivider={false}
+          />
+        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Paramètres</Text>
-          <Pressable
-            style={({ pressed }) => [styles.settingsRow, pressed && { backgroundColor: theme.surfaceSecondary }]}
-            onPress={() => router.push("/(main)/(tabs)/more")}
-          >
-            <View style={styles.settingInfo}>
-              <View style={[styles.settingIconContainer, { backgroundColor: "#6366F120" }]}>
-                <Ionicons name="settings-outline" size={20} color="#6366F1" />
-              </View>
-              <View style={styles.settingTextContainer}>
-                <Text style={styles.settingTitle}>Paramètres</Text>
-                <Text style={styles.settingDesc}>Mentions légales, support, version</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.settingsRow, pressed && { backgroundColor: theme.surfaceSecondary }]}
+        <Text style={styles.groupLabel}>Informations légales</Text>
+        <View style={styles.group}>
+          <SettingsRow icon="document-text-outline" iconBg="#6366F120" iconColor="#6366F1" label="Mentions légales" onPress={() => router.push("/legal")} showDivider />
+          <SettingsRow icon="shield-checkmark-outline" iconBg="#22C55E20" iconColor="#22C55E" label="Confidentialité" onPress={() => router.push("/privacy")} showDivider />
+          <SettingsRow icon="settings-outline" iconBg="#F59E0B20" iconColor="#F59E0B" label="Paramètres" onPress={() => router.push("/(main)/(tabs)/more")} showDivider={false} />
+        </View>
+
+        <Text style={styles.groupLabel}>Zone critique</Text>
+        <View style={styles.group}>
+          <SettingsRow
+            icon="trash-outline" iconBg="#EF444420" iconColor="#EF4444"
+            label="Supprimer mon compte"
+            sub="Action définitive et irréversible"
+            danger
             onPress={() => router.push("/(main)/delete-account" as any)}
-          >
-            <View style={styles.settingInfo}>
-              <View style={[styles.settingIconContainer, { backgroundColor: "#EF444420" }]}>
-                <Ionicons name="trash-outline" size={20} color="#EF4444" />
-              </View>
-              <View style={styles.settingTextContainer}>
-                <Text style={[styles.settingTitle, { color: "#EF4444" }]}>Supprimer mon compte</Text>
-                <Text style={styles.settingDesc}>Suppression définitive et irréversible</Text>
-              </View>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-          </Pressable>
+            showDivider={false}
+          />
         </View>
 
         <Pressable
-          style={({ pressed }) => [styles.logoutBtn, pressed && styles.logoutBtnPressed]}
+          style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.85 }]}
           onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={20} color={theme.primary} />
-          <Text style={styles.logoutBtnText}>Déconnexion</Text>
+          <Ionicons name="log-out-outline" size={20} color="#EF4444" />
+          <Text style={styles.logoutText}>Se déconnecter</Text>
         </Pressable>
+
+        <Text style={styles.version}>MyTools v1.0</Text>
       </ScrollView>
       {AlertComponent}
-      <FloatingSupport />
     </View>
   );
 }
 
 const getStyles = (theme: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  scrollContent: { paddingHorizontal: 20 },
-  headerTitle: {
-    fontSize: 24,
-    fontFamily: "Michroma_400Regular",
-    color: theme.text,
-    letterSpacing: 1,
-    marginBottom: 20,
-  },
+  scroll: { paddingHorizontal: 16 },
+
   avatarSection: { alignItems: "center", marginBottom: 20 },
+  avatarRing: {
+    width: 88, height: 88, borderRadius: 44,
+    borderWidth: 3, borderColor: theme.primary + "50",
+    justifyContent: "center", alignItems: "center", marginBottom: 12,
+  },
   avatar: {
-    width: 72, height: 72, borderRadius: 36,
+    width: 78, height: 78, borderRadius: 39,
     backgroundColor: theme.primary,
-    justifyContent: "center", alignItems: "center", marginBottom: 10,
-  },
-  avatarText: { fontSize: 26, fontFamily: "Inter_700Bold", color: "#fff" },
-  avatarName: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: theme.text, marginBottom: 6 },
-  roleBadge: {
-    backgroundColor: theme.surfaceSecondary,
-    paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20,
-    borderWidth: 1, borderColor: theme.border,
-  },
-  roleText: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
-  tabRow: {
-    flexDirection: "row",
-    backgroundColor: theme.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.border,
-    padding: 4,
-    marginBottom: 20,
-    gap: 4,
-  },
-  tabBtn: {
-    flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 6, paddingVertical: 10, borderRadius: 10,
-  },
-  tabBtnActive: { backgroundColor: theme.surfaceSecondary },
-  tabBtnText: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.textSecondary },
-  tabBtnTextActive: { color: theme.primary, fontFamily: "Inter_600SemiBold" },
-  statsCard: {
-    backgroundColor: theme.card,
-    borderRadius: 16, borderWidth: 1, borderColor: theme.border,
-    padding: 16, marginBottom: 20,
-  },
-  statsSectionTitle: {
-    fontSize: 11, fontFamily: "Inter_600SemiBold", color: theme.textTertiary,
-    textTransform: "uppercase" as const, letterSpacing: 1, marginBottom: 12,
-  },
-  statsGrid: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  statItem: { flex: 1, alignItems: "center", gap: 3 },
-  statDivider: { width: 1, height: 40, backgroundColor: theme.border },
-  statValue: { fontSize: 24, fontFamily: "Inter_700Bold", color: theme.text },
-  statLabel: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
-  statSub: { fontSize: 11, fontFamily: "Inter_400Regular", color: theme.primary },
-  statsLastActivity: {
-    fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary,
-    marginTop: 12, textAlign: "center",
-  },
-  section: { marginBottom: 24, gap: 8 },
-  sectionTitle: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.text, marginBottom: 4 },
-  fieldContainer: { gap: 4 },
-  fieldLabel: { fontSize: 11, fontFamily: "Inter_500Medium", color: theme.textTertiary, marginLeft: 4, textTransform: "uppercase" as const, letterSpacing: 0.5 },
-  fieldValueRow: {
-    flexDirection: "row", alignItems: "center", gap: 8,
-    backgroundColor: theme.surface, borderRadius: 10,
-    borderWidth: 1, borderColor: theme.border,
-    paddingHorizontal: 12, height: 44,
-  },
-  fieldValue: { fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text },
-  fieldValueEmpty: { color: theme.textTertiary },
-  webPortalCard: {
-    backgroundColor: theme.card, borderRadius: 14, borderWidth: 1,
-    borderColor: theme.border, padding: 20, alignItems: "center", gap: 12,
-  },
-  webPortalIconContainer: {
-    width: 48, height: 48, borderRadius: 24,
-    backgroundColor: theme.primary + "15",
     justifyContent: "center", alignItems: "center",
   },
-  webPortalMessage: {
-    fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textSecondary,
-    textAlign: "center", lineHeight: 20,
+  avatarText: { fontSize: 30, fontFamily: "Inter_700Bold", color: "#fff" },
+  avatarName: { fontSize: 20, fontFamily: "Inter_600SemiBold", color: theme.text, marginBottom: 3 },
+  avatarEmail: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textSecondary, marginBottom: 8 },
+  rolePill: {
+    flexDirection: "row", alignItems: "center", gap: 6,
+    backgroundColor: theme.surface, borderRadius: 20, borderWidth: 1, borderColor: theme.border,
+    paddingHorizontal: 12, paddingVertical: 5,
   },
-  webPortalBtn: {
+  roleDot: { width: 7, height: 7, borderRadius: 4 },
+  roleText: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+
+  statsRow: {
+    flexDirection: "row", backgroundColor: theme.surface,
+    borderRadius: 16, borderWidth: 1, borderColor: theme.border,
+    marginBottom: 24, overflow: "hidden",
+  },
+  statBox: { flex: 1, alignItems: "center", paddingVertical: 16 },
+  statSep: { width: 1, height: "60%", alignSelf: "center", backgroundColor: theme.border },
+  statNum: { fontSize: 22, fontFamily: "Inter_700Bold", color: theme.text, marginBottom: 3 },
+  statLbl: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+
+  groupLabel: {
+    fontSize: 12, fontFamily: "Inter_600SemiBold", color: theme.textTertiary,
+    textTransform: "uppercase", letterSpacing: 0.8,
+    marginBottom: 8, marginLeft: 4,
+  },
+  group: {
+    backgroundColor: theme.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: theme.border,
+    marginBottom: 24, overflow: "hidden",
+  },
+  row: {
+    flexDirection: "row", alignItems: "center",
+    paddingHorizontal: 14, paddingVertical: 13, gap: 12,
+    minHeight: 52,
+  },
+  rowIcon: { width: 34, height: 34, borderRadius: 8, justifyContent: "center", alignItems: "center" },
+  rowContent: { flex: 1 },
+  rowLabel: { fontSize: 15, fontFamily: "Inter_500Medium", color: theme.text },
+  rowSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary, marginTop: 1 },
+  inGroupDivider: { height: 1, backgroundColor: theme.border, marginLeft: 60 },
+
+  portalBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    backgroundColor: theme.primary, borderRadius: 10, height: 44, paddingHorizontal: 20, width: "100%",
+    backgroundColor: theme.primary, borderRadius: 14, height: 48,
+    marginBottom: 24,
   },
-  webPortalBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  settingRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14,
-  },
-  settingInfo: { flexDirection: "row", alignItems: "center", flex: 1, gap: 12 },
-  settingIconContainer: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center" },
-  settingTextContainer: { flex: 1 },
-  settingTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.text },
-  settingDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary, marginTop: 2 },
-  notifInfoBox: {
-    flexDirection: "row", backgroundColor: theme.surface, borderRadius: 10,
-    borderWidth: 1, borderColor: theme.border, padding: 12, gap: 8,
-    alignItems: "flex-start", marginTop: 4,
-  },
-  notifInfoText: { flex: 1, fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary, lineHeight: 17 },
+  portalBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
   logoutBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
-    paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: theme.primary, marginTop: 8,
+    backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: "#EF444440",
+    height: 50, marginBottom: 12,
   },
-  logoutBtnPressed: { backgroundColor: theme.primary + "15" },
-  logoutBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.primary },
-  settingsRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: theme.card, borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 14,
-  },
+  logoutText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#EF4444" },
+  version: { fontSize: 11, fontFamily: "Michroma_400Regular", color: theme.textTertiary, textAlign: "center", marginBottom: 8, opacity: 0.5 },
 });

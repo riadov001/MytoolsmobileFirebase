@@ -1,16 +1,22 @@
-# MyJantes - Application Mobile
+# MyTools - Application Mobile (MyJantes Customer Portal)
 
 ## Overview
 Application mobile Expo React Native pour MyJantes, un service professionnel de rénovation et personnalisation de jantes automobiles. L'app permet aux particuliers et professionnels de demander des devis gratuits en ligne.
 
 ## Architecture
 - **Frontend**: Expo React Native (Expo Router, file-based routing)
-- **Backend**: API externe hébergée sur `saas2.mytoolsgroup.eu`
+- **Backend**: API externe hébergée sur `apps.mytoolsgroup.eu`
 - **Auth**: Sessions avec cookies (stockés via expo-secure-store / AsyncStorage)
 - **State**: React Query pour les données serveur, React Context pour l'auth
 
+## Design
+- **Futuristic iPhone-style**: iOS Settings-style grouped lists, Michroma font for titles, Inter for body
+- **Primary color**: `#DC2626` (light) / `#EF4444` (dark)
+- **Logo**: `assets/images/logo_new.png` (also used as app icon)
+- **First launch**: GDPR consent screen (`app/consent.tsx`) shown once, saved in AsyncStorage `consent_given`
+
 ## API Backend
-Base URL: Configurable via `EXTERNAL_API_URL` env var (default: `https://saas2.mytoolsgroup.eu/api`)
+Base URL: Configurable via `EXTERNAL_API_URL` env var (default: `https://apps.mytoolsgroup.eu/api`)
 
 ### Endpoints principaux
 - `POST /api/register` - Inscription (email, password, firstName, lastName, role, etc.)

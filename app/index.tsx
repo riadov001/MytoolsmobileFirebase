@@ -2,6 +2,7 @@ import React, { useEffect, useMemo } from "react";
 import { View, ActivityIndicator, StyleSheet, Text } from "react-native";
 import { Image } from "expo-image";
 import { router } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
@@ -13,11 +14,18 @@ export default function IndexScreen() {
 
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated) {
-        router.replace("/(main)" as any);
-      } else {
-        router.replace("/(auth)/login");
-      }
+      (async () => {
+        const consent = await AsyncStorage.getItem("consent_given");
+        if (!consent) {
+          router.replace("/consent");
+          return;
+        }
+        if (isAuthenticated) {
+          router.replace("/(main)" as any);
+        } else {
+          router.replace("/(auth)/login");
+        }
+      })();
     }
   }, [isLoading, isAuthenticated]);
 
@@ -25,7 +33,7 @@ export default function IndexScreen() {
     <View style={styles.container}>
       <View style={styles.logoWrapper}>
         <Image
-          source={require("@/assets/images/logo_rounded.png")}
+          source={require("@/assets/images/logo_new.png")}
           style={styles.logo}
           contentFit="contain"
         />
@@ -38,32 +46,18 @@ export default function IndexScreen() {
 
 const getStyles = (theme: ThemeColors) => StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    flex: 1, justifyContent: "center", alignItems: "center",
     backgroundColor: theme.background,
   },
   logoWrapper: {
-    width: 240,
-    height: 240,
-    marginBottom: 24,
-    justifyContent: "center",
-    alignItems: "center",
+    width: 180, height: 180, marginBottom: 32,
+    justifyContent: "center", alignItems: "center",
   },
-  logo: {
-    width: "100%",
-    height: "100%",
-  },
-  loader: {
-    marginBottom: 40,
-  },
+  logo: { width: "100%", height: "100%" },
+  loader: { marginBottom: 40 },
   versionText: {
-    position: "absolute",
-    bottom: 40,
-    fontSize: 11,
-    fontFamily: "Michroma_400Regular",
-    color: theme.textTertiary,
-    opacity: 0.5,
-    letterSpacing: 2,
+    position: "absolute", bottom: 40,
+    fontSize: 11, fontFamily: "Michroma_400Regular",
+    color: theme.textTertiary, opacity: 0.5, letterSpacing: 2,
   },
 });

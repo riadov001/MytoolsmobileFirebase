@@ -20,12 +20,14 @@
         "usesNonExemptEncryption": false
       },
       "infoPlist": {
-        "NSCameraUsageDescription": "Cette application nécessite l'accès à l'appareil photo pour vous permettre de prendre des photos de vos jantes lors de vos demandes de devis.",
-        "NSPhotoLibraryUsageDescription": "Cette application nécessite l'accès à votre bibliothèque de photos pour vous permettre de choisir des photos de vos jantes pour vos demandes de devis.",
-        "NSFaceIDUsageDescription": "Cette application utilise Face ID pour vous permettre de vous connecter de manière sécurisée et rapide à votre compte.",
-        "ITSAppUsesNonExemptEncryption": "NO",
-        "NSMicrophoneUsageDescription": "Cette application n'utilise pas le microphone, mais cette autorisation est requise par certains composants système.",
-        "NSLocationWhenInUseUsageDescription": "Cette application n'utilise pas votre position, mais cette autorisation est requise par certains composants système."
+        "NSCameraUsageDescription": "MyTools nécessite l'accès à l'appareil photo pour vous permettre de prendre des photos de vos jantes lors de vos demandes de devis.",
+        "NSPhotoLibraryUsageDescription": "MyTools nécessite l'accès à votre bibliothèque de photos pour vous permettre de sélectionner des photos de vos jantes pour vos demandes de devis.",
+        "NSPhotoLibraryAddUsageDescription": "MyTools souhaite enregistrer des photos dans votre bibliothèque.",
+        "NSFaceIDUsageDescription": "MyTools utilise Face ID pour vous permettre de vous connecter de manière sécurisée et rapide à votre compte.",
+        "NSUserTrackingUsageDescription": "MyTools n'effectue aucun suivi publicitaire. Votre vie privée est notre priorité.",
+        "NSMicrophoneUsageDescription": "MyTools n'utilise pas le microphone.",
+        "NSLocationWhenInUseUsageDescription": "MyTools n'utilise pas votre localisation.",
+        "ITSAppUsesNonExemptEncryption": "NO"
       }
     },
     "android": {
@@ -54,6 +56,14 @@
       "expo-font",
       "expo-web-browser",
       "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#DC2626",
+          "sounds": []
+        }
+      ],
       [
         "expo-camera",
         {

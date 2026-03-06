@@ -1,12 +1,6 @@
 import React, { useState, useMemo } from "react";
 import {
-  View,
-  Text,
-  Pressable,
-  StyleSheet,
-  Platform,
-  Modal,
-  ActivityIndicator,
+  View, Text, Pressable, StyleSheet, Platform, ScrollView, ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -19,9 +13,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 
 async function clearAllStorage() {
-  try {
-    await AsyncStorage.clear();
-  } catch {}
+  try { await AsyncStorage.clear(); } catch {}
   if (Platform.OS !== "web") {
     try {
       await SecureStore.deleteItemAsync("session_cookie");
@@ -30,36 +22,37 @@ async function clearAllStorage() {
   }
 }
 
+const DELETIONS = [
+  "Votre compte et identifiants de connexion",
+  "Toutes vos données personnelles (nom, email, téléphone, adresse)",
+  "L'historique de vos devis et demandes",
+  "L'historique de vos factures",
+  "Vos réservations et rendez-vous",
+  "Vos préférences et paramètres de l'application",
+];
+
 export default function DeleteAccountScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
   const { showAlert, AlertComponent } = useCustomAlert();
-  const [modalVisible, setModalVisible] = useState(false);
+  const [step, setStep] = useState<1 | 2>(1);
   const [deleting, setDeleting] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
 
   const handleDelete = async () => {
     setDeleting(true);
     try {
       await apiCall("/api/users/me", { method: "DELETE" });
-      setModalVisible(false);
       await clearAllStorage();
       showAlert({
         type: "success",
         title: "Compte supprimé",
-        message: "Votre compte a été définitivement supprimé.",
-        buttons: [
-          {
-            text: "OK",
-            style: "primary",
-            onPress: () => {
-              router.replace("/(auth)/login");
-            },
-          },
-        ],
+        message: "Votre compte et toutes vos données ont été définitivement supprimés conformément au RGPD.",
+        buttons: [{ text: "OK", style: "primary", onPress: () => router.replace("/(auth)/login") }],
       });
     } catch (err: any) {
-      setModalVisible(false);
+      setStep(1);
       showAlert({
         type: "error",
         title: "Erreur",
@@ -71,14 +64,12 @@ export default function DeleteAccountScreen() {
     }
   };
 
+  const topPadding = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
+  const bottomPadding = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
+
   return (
     <View style={styles.container}>
-      <View
-        style={[
-          styles.header,
-          { paddingTop: Platform.OS === "web" ? 67 + 16 : insets.top + 16 },
-        ]}
-      >
+      <View style={[styles.header, { paddingTop: topPadding }]}>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />
         </Pressable>
@@ -86,256 +77,173 @@ export default function DeleteAccountScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.warningCard}>
-          <View style={styles.warningIconContainer}>
-            <Ionicons name="warning" size={40} color="#EF4444" />
-          </View>
-          <Text style={styles.warningTitle}>Suppression du compte</Text>
-          <Text style={styles.warningText}>
-            La suppression de votre compte est une action irréversible. Toutes vos données personnelles, devis, factures et historique seront définitivement supprimés.
-          </Text>
-        </View>
-
-        <View style={styles.infoSection}>
-          <View style={styles.infoRow}>
-            <Ionicons name="close-circle" size={20} color="#EF4444" />
-            <Text style={styles.infoText}>Vos données personnelles seront supprimées</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="close-circle" size={20} color="#EF4444" />
-            <Text style={styles.infoText}>Vos devis et factures seront supprimés</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="close-circle" size={20} color="#EF4444" />
-            <Text style={styles.infoText}>Vos réservations seront annulées</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Ionicons name="close-circle" size={20} color="#EF4444" />
-            <Text style={styles.infoText}>Cette action est irréversible</Text>
-          </View>
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [styles.deleteBtn, pressed && styles.deleteBtnPressed]}
-          onPress={() => setModalVisible(true)}
-        >
-          <Ionicons name="trash-outline" size={20} color="#fff" />
-          <Text style={styles.deleteBtnText}>Supprimer mon compte</Text>
-        </Pressable>
-      </View>
-
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => !deleting && setModalVisible(false)}
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPadding }]}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalIconContainer}>
-              <Ionicons name="alert-circle" size={48} color="#EF4444" />
+        {step === 1 && (
+          <>
+            <View style={styles.warningBanner}>
+              <Ionicons name="warning" size={32} color="#EF4444" />
+              <Text style={styles.warningTitle}>Action irréversible</Text>
+              <Text style={styles.warningText}>
+                La suppression de votre compte est définitive et irréversible. Conformément au RGPD (Règlement Général sur la Protection des Données), l'ensemble de vos données personnelles sera effacé de nos systèmes.
+              </Text>
             </View>
-            <Text style={styles.modalTitle}>Supprimer le compte</Text>
-            <Text style={styles.modalMessage}>
-              Êtes-vous sûr(e) ? Cette action est définitive et irréversible.
-            </Text>
-            <View style={styles.modalButtons}>
-              <Pressable
-                style={({ pressed }) => [styles.modalCancelBtn, pressed && { opacity: 0.7 }]}
-                onPress={() => setModalVisible(false)}
-                disabled={deleting}
-              >
-                <Text style={styles.modalCancelText}>Annuler</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [styles.modalDeleteBtn, pressed && { opacity: 0.7 }]}
-                onPress={handleDelete}
-                disabled={deleting}
-              >
-                {deleting ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.modalDeleteText}>Supprimer</Text>
-                )}
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
+            <Text style={styles.sectionTitle}>Ce qui sera supprimé définitivement :</Text>
+            <View style={styles.listGroup}>
+              {DELETIONS.map((item, i) => (
+                <React.Fragment key={i}>
+                  <View style={styles.listRow}>
+                    <View style={styles.listIcon}>
+                      <Ionicons name="close" size={14} color="#EF4444" />
+                    </View>
+                    <Text style={styles.listText}>{item}</Text>
+                  </View>
+                  {i < DELETIONS.length - 1 && <View style={styles.listDivider} />}
+                </React.Fragment>
+              ))}
+            </View>
+
+            <View style={styles.rgpdBox}>
+              <Ionicons name="shield-checkmark-outline" size={18} color="#6366F1" />
+              <Text style={styles.rgpdText}>
+                Conformément à l'article 17 du RGPD, vous avez le droit à l'effacement de vos données. Cette suppression prend effet immédiatement et de manière permanente.
+              </Text>
+            </View>
+
+            <Pressable
+              style={({ pressed }) => [styles.nextBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => setStep(2)}
+            >
+              <Text style={styles.nextBtnText}>Continuer vers la confirmation</Text>
+              <Ionicons name="chevron-forward" size={18} color="#fff" />
+            </Pressable>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <View style={styles.confirmBanner}>
+              <Ionicons name="alert-circle" size={28} color="#EF4444" />
+              <Text style={styles.confirmTitle}>Confirmation finale</Text>
+            </View>
+
+            <Text style={styles.confirmText}>
+              Vous êtes sur le point de supprimer définitivement votre compte et toutes les données associées. Cette action ne peut pas être annulée.
+            </Text>
+
+            <Pressable style={styles.checkRow} onPress={() => setConfirmed(v => !v)}>
+              <View style={[styles.checkbox, confirmed && { backgroundColor: "#EF4444", borderColor: "#EF4444" }]}>
+                {confirmed && <Ionicons name="checkmark" size={14} color="#fff" />}
+              </View>
+              <Text style={styles.checkLabel}>
+                Je comprends que la suppression est définitive et irréversible, et que toutes mes données seront effacées conformément au RGPD.
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.deleteBtn,
+                !confirmed && styles.deleteBtnDisabled,
+                pressed && confirmed && { opacity: 0.85 },
+              ]}
+              onPress={handleDelete}
+              disabled={!confirmed || deleting}
+            >
+              {deleting ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Ionicons name="trash" size={18} color="#fff" />
+                  <Text style={styles.deleteBtnText}>Supprimer définitivement mon compte</Text>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable style={styles.cancelBtn} onPress={() => { setStep(1); setConfirmed(false); }}>
+              <Text style={styles.cancelBtnText}>Annuler</Text>
+            </Pressable>
+          </>
+        )}
+      </ScrollView>
       {AlertComponent}
     </View>
   );
 }
 
 const getStyles = (theme: ThemeColors) => StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1, backgroundColor: theme.background },
+  header: {
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+    paddingHorizontal: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
     backgroundColor: theme.background,
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.border,
+  backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: theme.text },
+  scroll: { paddingHorizontal: 16, paddingTop: 20, gap: 16 },
+
+  warningBanner: {
+    backgroundColor: "#EF444415", borderRadius: 16, borderWidth: 1, borderColor: "#EF444430",
+    padding: 20, alignItems: "center", gap: 10,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.surface,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_600SemiBold",
-    color: theme.text,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 32,
-  },
-  warningCard: {
-    backgroundColor: theme.surface,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#EF444430",
-    marginBottom: 24,
-  },
-  warningIconContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "#EF444415",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  warningTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: theme.text,
-    marginBottom: 8,
-  },
+  warningTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#EF4444" },
   warningText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: theme.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
+    fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary,
+    textAlign: "center", lineHeight: 21,
   },
-  infoSection: {
-    backgroundColor: theme.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: theme.border,
-    gap: 14,
-    marginBottom: 32,
+
+  sectionTitle: {
+    fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.textTertiary,
+    textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 4,
   },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
+  listGroup: {
+    backgroundColor: theme.surface, borderRadius: 14,
+    borderWidth: 1, borderColor: theme.border, overflow: "hidden",
   },
-  infoText: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: theme.textSecondary,
-    flex: 1,
+  listRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 14, paddingVertical: 13, gap: 12 },
+  listIcon: {
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: "#EF444415",
+    justifyContent: "center", alignItems: "center",
   },
+  listText: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text, flex: 1 },
+  listDivider: { height: 1, backgroundColor: theme.border, marginLeft: 52 },
+
+  rgpdBox: {
+    flexDirection: "row", gap: 10, backgroundColor: "#6366F115",
+    borderRadius: 12, borderWidth: 1, borderColor: "#6366F130", padding: 14, alignItems: "flex-start",
+  },
+  rgpdText: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textSecondary, flex: 1, lineHeight: 20 },
+
+  nextBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: theme.text, borderRadius: 14, height: 52,
+  },
+  nextBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.background },
+
+  confirmBanner: { alignItems: "center", gap: 8, marginBottom: 4 },
+  confirmTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#EF4444" },
+  confirmText: {
+    fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary,
+    textAlign: "center", lineHeight: 21,
+  },
+  checkRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
+  checkbox: {
+    width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: theme.border,
+    justifyContent: "center", alignItems: "center", marginTop: 1, backgroundColor: theme.surface,
+  },
+  checkLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text, lineHeight: 21 },
+
   deleteBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "#EF4444",
-    borderRadius: 12,
-    height: 52,
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: "#EF4444", borderRadius: 14, height: 52,
   },
-  deleteBtnPressed: {
-    backgroundColor: "#DC2626",
-  },
-  deleteBtnText: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 32,
-  },
-  modalContent: {
-    backgroundColor: theme.surface,
-    borderRadius: 20,
-    padding: 28,
-    alignItems: "center",
-    width: "100%",
-    maxWidth: 340,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  modalIconContainer: {
-    marginBottom: 12,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: theme.text,
-    marginBottom: 8,
-  },
-  modalMessage: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: theme.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  modalButtons: {
-    flexDirection: "row",
-    gap: 12,
-    width: "100%",
-  },
-  modalCancelBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: theme.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: theme.border,
-  },
-  modalCancelText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: theme.text,
-  },
-  modalDeleteBtn: {
-    flex: 1,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#EF4444",
-  },
-  modalDeleteText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: "#fff",
-  },
+  deleteBtnDisabled: { backgroundColor: theme.border },
+  deleteBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+
+  cancelBtn: { alignItems: "center", paddingVertical: 14 },
+  cancelBtnText: { fontSize: 15, fontFamily: "Inter_500Medium", color: theme.textSecondary },
 });
