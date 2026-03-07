@@ -89,3 +89,4 @@ PORT = "8081"
 PORT = "8081"
 
 [userenv.shared]
+EXTERNAL_API_URL = "https://saas.mytoolsgroup.eu/api"

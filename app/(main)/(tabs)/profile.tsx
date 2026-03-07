@@ -15,7 +15,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
 
-const WEB_PORTAL_URL = "https://apps.mytoolsgroup.eu";
+const WEB_PORTAL_URL = "https://saas.mytoolsgroup.eu";
 
 async function getStoredValue(key: string): Promise<string | null> {
   if (Platform.OS === "web") return AsyncStorage.getItem(key);
