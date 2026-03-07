@@ -110,7 +110,7 @@ export default function LoginScreen() {
             <View style={styles.glowRingOuter} />
             <View style={styles.glowRingInner} />
             <Image
-              source={require("@/assets/images/logo_rounded.png")}
+              source={require("@/assets/images/logo_new.png")}
               style={styles.logo}
               contentFit="contain"
             />

@@ -82,7 +82,7 @@ export default function MoreScreen() {
         </View>
 
         <View style={styles.footer}>
-          <Image source={require("@/assets/images/logo_rounded.png")} style={styles.footerLogo} contentFit="contain" />
+          <Image source={require("@/assets/images/logo_new.png")} style={styles.footerLogo} contentFit="contain" />
           <Text style={styles.footerBrand}>MYTOOLS</Text>
           <Text style={styles.footerSubtext}>Built for Performance</Text>
         </View>

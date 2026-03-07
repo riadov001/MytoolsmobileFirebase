@@ -103,7 +103,7 @@ export default function HomeScreen() {
       >
         <View style={styles.header}>
           <Image
-            source={require("@/assets/images/logo_rounded.png")}
+            source={require("@/assets/images/logo_new.png")}
             style={styles.headerLogo}
             contentFit="contain"
           />
