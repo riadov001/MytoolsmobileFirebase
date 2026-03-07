@@ -1,6 +1,7 @@
 import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 import { router } from "expo-router";
+import { getSessionCookie } from "./api";
 
 const getApiBase = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
@@ -49,11 +50,17 @@ export async function adminApiCall<T = any>(
   const fetchHeaders: Record<string, string> = {
     Accept: "application/json",
     "Content-Type": "application/json",
+    "X-Requested-With": "XMLHttpRequest",
     ...headers,
   };
 
   if (accessToken) {
     fetchHeaders["Authorization"] = `Bearer ${accessToken}`;
+  }
+
+  const cookie = getSessionCookie();
+  if (cookie) {
+    fetchHeaders["Cookie"] = cookie;
   }
 
   const url = `${API_BASE}${endpoint}`;
@@ -69,17 +76,13 @@ export async function adminApiCall<T = any>(
 
   const res = await expoFetch(url, fetchOptions);
 
+  const xSessionCookie = res.headers.get("x-session-cookie");
+  if (xSessionCookie) {
+    const { setSessionCookie } = require("./api");
+    setSessionCookie(xSessionCookie);
+  }
+
   if (res.status === 401) {
-    const refreshed = await tryRefreshToken();
-    if (refreshed) {
-      fetchHeaders["Authorization"] = `Bearer ${accessToken}`;
-      const retryRes = await expoFetch(url, { ...fetchOptions, headers: fetchHeaders });
-      if (!retryRes.ok) {
-        const errMsg = await parseError(retryRes);
-        throw new Error(errMsg);
-      }
-      return parseResponse<T>(retryRes);
-    }
     if (onTokenExpired) onTokenExpired();
     throw new Error("Session expirée. Veuillez vous reconnecter.");
   }
@@ -96,26 +99,6 @@ export async function adminApiCall<T = any>(
   return parseResponse<T>(res);
 }
 
-async function tryRefreshToken(): Promise<boolean> {
-  if (!refreshTokenValue) return false;
-  try {
-    const res = await expoFetch(`${API_BASE}/api/mobile/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: refreshTokenValue }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      if (data.accessToken) {
-        accessToken = data.accessToken;
-        if (data.refreshToken) refreshTokenValue = data.refreshToken;
-        return true;
-      }
-    }
-  } catch {}
-  return false;
-}
-
 async function parseError(res: Response): Promise<string> {
   let errorMessage = `Erreur ${res.status}`;
   try {
@@ -124,7 +107,7 @@ async function parseError(res: Response): Promise<string> {
       const errorData = JSON.parse(text);
       errorMessage = errorData.message || errorData.error || errorMessage;
     } catch {
-      if (text) errorMessage = text.substring(0, 200);
+      if (text && !text.startsWith("<!DOCTYPE")) errorMessage = text.substring(0, 200);
     }
   } catch {}
   return errorMessage;
@@ -133,6 +116,9 @@ async function parseError(res: Response): Promise<string> {
 async function parseResponse<T>(res: Response): Promise<T> {
   const text = await res.text();
   if (!text || text.trim() === "") return {} as T;
+  if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+    return {} as T;
+  }
   try {
     return JSON.parse(text) as T;
   } catch {
@@ -141,9 +127,19 @@ async function parseResponse<T>(res: Response): Promise<T> {
 }
 
 export async function adminLogin(email: string, password: string) {
-  const res = await expoFetch(`${API_BASE}/api/mobile/auth/login`, {
+  const cookie = getSessionCookie();
+  const loginHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+    Accept: "application/json",
+    "X-Requested-With": "XMLHttpRequest",
+  };
+  if (cookie) {
+    loginHeaders["Cookie"] = cookie;
+  }
+
+  const res = await expoFetch(`${API_BASE}/api/login`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    headers: loginHeaders,
     body: JSON.stringify({ email, password }),
   });
 
@@ -152,60 +148,81 @@ export async function adminLogin(email: string, password: string) {
     throw new Error(errMsg);
   }
 
+  const xSessionCookie = res.headers.get("x-session-cookie");
+  if (xSessionCookie) {
+    const { setSessionCookie } = require("./api");
+    setSessionCookie(xSessionCookie);
+  }
+
   const data = await res.json();
+
   if (data.accessToken) {
     accessToken = data.accessToken;
     refreshTokenValue = data.refreshToken || null;
   }
-  return data;
+
+  let user = data;
+  if (data.user) user = data.user;
+  else if (data.data) user = data.data;
+
+  return { user, accessToken: data.accessToken || null, refreshToken: data.refreshToken || null };
 }
 
 export const adminAnalytics = {
-  get: () => adminApiCall<any>("/api/mobile/admin/analytics"),
+  get: () => adminApiCall<any>("/api/admin/analytics"),
+  getAdvanced: () => adminApiCall<any>("/api/admin/advanced-analytics"),
 };
 
 export const adminQuotes = {
-  getAll: () => adminApiCall<any[]>("/api/mobile/admin/quotes"),
-  getById: (id: string) => adminApiCall<any>(`/api/mobile/quotes/${id}`),
-  create: (data: any) => adminApiCall<any>("/api/mobile/admin/quotes", { method: "POST", body: data }),
-  update: (id: string, data: any) => adminApiCall<any>(`/api/mobile/admin/quotes/${id}`, { method: "PATCH", body: data }),
-  updateStatus: (id: string, status: string) => adminApiCall<any>(`/api/mobile/admin/quotes/${id}/status`, { method: "PATCH", body: { status } }),
-  delete: (id: string) => adminApiCall<any>(`/api/mobile/admin/quotes/${id}`, { method: "DELETE" }),
+  getAll: () => adminApiCall<any[]>("/api/admin/quotes"),
+  getById: (id: string) => adminApiCall<any>(`/api/admin/quotes/${id}`),
+  create: (data: any) => adminApiCall<any>("/api/admin/quotes", { method: "POST", body: data }),
+  update: (id: string, data: any) => adminApiCall<any>(`/api/admin/quotes/${id}`, { method: "PATCH", body: data }),
+  updateStatus: (id: string, status: string) => adminApiCall<any>(`/api/admin/quotes/${id}/status`, { method: "PATCH", body: { status } }),
+  delete: (id: string) => adminApiCall<any>(`/api/admin/quotes/${id}`, { method: "DELETE" }),
 };
 
 export const adminInvoices = {
-  getAll: () => adminApiCall<any[]>("/api/mobile/admin/invoices"),
-  getById: (id: string) => adminApiCall<any>(`/api/mobile/invoices/${id}`),
-  create: (data: any) => adminApiCall<any>("/api/mobile/admin/invoices", { method: "POST", body: data }),
-  update: (id: string, data: any) => adminApiCall<any>(`/api/mobile/admin/invoices/${id}`, { method: "PATCH", body: data }),
-  delete: (id: string) => adminApiCall<any>(`/api/mobile/admin/invoices/${id}`, { method: "DELETE" }),
+  getAll: () => adminApiCall<any[]>("/api/admin/invoices"),
+  getById: (id: string) => adminApiCall<any>(`/api/admin/invoices/${id}`),
+  create: (data: any) => adminApiCall<any>("/api/admin/invoices", { method: "POST", body: data }),
+  update: (id: string, data: any) => adminApiCall<any>(`/api/admin/invoices/${id}`, { method: "PATCH", body: data }),
+  delete: (id: string) => adminApiCall<any>(`/api/admin/invoices/${id}`, { method: "DELETE" }),
 };
 
 export const adminReservations = {
-  getAll: () => adminApiCall<any[]>("/api/mobile/admin/reservations"),
-  getById: (id: string) => adminApiCall<any>(`/api/mobile/reservations/${id}`),
-  create: (data: any) => adminApiCall<any>("/api/mobile/admin/reservations", { method: "POST", body: data }),
-  update: (id: string, data: any) => adminApiCall<any>(`/api/mobile/admin/reservations/${id}`, { method: "PATCH", body: data }),
-  updateStatus: (id: string, status: string) => adminApiCall<any>(`/api/mobile/admin/reservations/${id}/status`, { method: "PATCH", body: { status } }),
-  delete: (id: string) => adminApiCall<any>(`/api/mobile/admin/reservations/${id}`, { method: "DELETE" }),
+  getAll: () => adminApiCall<any[]>("/api/admin/reservations"),
+  getById: (id: string) => adminApiCall<any>(`/api/admin/reservations/${id}`),
+  create: (data: any) => adminApiCall<any>("/api/admin/reservations", { method: "POST", body: data }),
+  update: (id: string, data: any) => adminApiCall<any>(`/api/admin/reservations/${id}`, { method: "PATCH", body: data }),
+  updateStatus: (id: string, status: string) => adminApiCall<any>(`/api/admin/reservations/${id}/status`, { method: "PATCH", body: { status } }),
+  delete: (id: string) => adminApiCall<any>(`/api/admin/reservations/${id}`, { method: "DELETE" }),
 };
 
 export const adminClients = {
-  getAll: () => adminApiCall<any[]>("/api/mobile/admin/clients"),
-  getById: (id: string) => adminApiCall<any>(`/api/mobile/admin/clients/${id}`),
-  create: (data: any) => adminApiCall<any>("/api/mobile/admin/clients", { method: "POST", body: data }),
-  update: (id: string, data: any) => adminApiCall<any>(`/api/mobile/admin/clients/${id}`, { method: "PATCH", body: data }),
-  delete: (id: string) => adminApiCall<any>(`/api/mobile/admin/clients/${id}`, { method: "DELETE" }),
+  getAll: () => adminApiCall<any[]>("/api/admin/clients"),
+  getById: (id: string) => adminApiCall<any>(`/api/admin/clients/${id}`),
+  create: (data: any) => adminApiCall<any>("/api/admin/clients", { method: "POST", body: data }),
+  update: (id: string, data: any) => adminApiCall<any>(`/api/admin/clients/${id}`, { method: "PATCH", body: data }),
+  delete: (id: string) => adminApiCall<any>(`/api/admin/clients/${id}`, { method: "DELETE" }),
+};
+
+export const adminServices = {
+  getAll: () => adminApiCall<any[]>("/api/admin/services"),
+  getById: (id: string) => adminApiCall<any>(`/api/admin/services/${id}`),
+  create: (data: any) => adminApiCall<any>("/api/admin/services", { method: "POST", body: data }),
+  update: (id: string, data: any) => adminApiCall<any>(`/api/admin/services/${id}`, { method: "PATCH", body: data }),
+  delete: (id: string) => adminApiCall<any>(`/api/admin/services/${id}`, { method: "DELETE" }),
 };
 
 export const adminProfile = {
-  get: () => adminApiCall<any>("/api/mobile/profile"),
-  update: (data: any) => adminApiCall<any>("/api/mobile/profile", { method: "PATCH", body: data }),
+  get: () => adminApiCall<any>("/api/user/profile"),
+  update: (data: any) => adminApiCall<any>("/api/user/profile", { method: "PATCH", body: data }),
 };
 
 export const adminNotifications = {
-  getAll: () => adminApiCall<any[]>("/api/mobile/notifications"),
-  getUnreadCount: () => adminApiCall<{ count: number }>("/api/mobile/notifications/unread-count"),
-  markRead: (id: string) => adminApiCall<any>(`/api/mobile/notifications/${id}/read`, { method: "PATCH" }),
-  markAllRead: () => adminApiCall<any>("/api/mobile/notifications/mark-all-read", { method: "POST" }),
+  getAll: () => adminApiCall<any[]>("/api/notifications"),
+  getUnreadCount: () => adminApiCall<{ count: number }>("/api/notifications/unread-count"),
+  markRead: (id: string) => adminApiCall<any>(`/api/notifications/${id}/read`, { method: "PATCH" }),
+  markAllRead: () => adminApiCall<any>("/api/notifications/read-all", { method: "POST" }),
 };

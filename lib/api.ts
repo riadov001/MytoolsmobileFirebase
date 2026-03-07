@@ -32,14 +32,13 @@ let sessionCookie: string | null = null;
 export function setSessionCookie(cookie: string | null) {
   if (cookie) {
     if (cookie.includes("=")) {
-      sessionCookie = cookie.split(";")[0];
+      sessionCookie = cookie;
     } else {
-      sessionCookie = `connect.sid=${cookie}`;
+      sessionCookie = `myjantes.sid=${cookie}`;
     }
   } else {
     sessionCookie = null;
   }
-
 }
 
 export function getSessionCookie() {
@@ -110,6 +109,7 @@ export async function apiCall<T = any>(
     if (setCookie) {
       const parts = setCookie.split(",").map(c => c.trim());
       const knownSession = parts.find(c =>
+        c.startsWith("myjantes.sid=") ||
         c.startsWith("connect.sid=") ||
         c.startsWith("laravel_session=") ||
         c.startsWith("PHPSESSID=") ||

@@ -130,76 +130,75 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (savedAccessToken) {
         setAdminTokens(savedAccessToken, savedRefreshToken);
         setStoredAccessToken(savedAccessToken);
-        try {
-          const { adminApiCall } = require("./admin-api");
-          const userData = await adminApiCall("/api/mobile/auth/me");
-          if (userData && (userData.id || userData.email)) {
-            setUser(userData);
-            return;
-          }
-        } catch {
-          await removeToken("access_token");
-          await removeToken("refresh_token");
-          setAdminTokens(null, null);
-          setStoredAccessToken(null);
-        }
       }
 
       const savedCookie = await getToken("session_cookie");
       if (savedCookie) {
         setSessionCookie(savedCookie);
-        const userData = await authApi.getUser();
-        setUser(userData);
+      }
+
+      if (savedAccessToken || savedCookie) {
+        try {
+          const { adminApiCall } = require("./admin-api");
+          const userData = await adminApiCall("/api/auth/user");
+          if (userData && (userData.id || userData.email)) {
+            setUser(userData);
+            return;
+          }
+        } catch {}
+
+        try {
+          const userData = await authApi.getUser();
+          if (userData && (userData.id || userData.email)) {
+            setUser(userData);
+            return;
+          }
+        } catch {}
+
+        await removeToken("access_token");
+        await removeToken("refresh_token");
+        await removeToken("session_cookie");
+        setAdminTokens(null, null);
+        setStoredAccessToken(null);
+        setSessionCookie(null);
       }
     } catch {
       await removeToken("session_cookie");
+      await removeToken("access_token");
+      await removeToken("refresh_token");
       setSessionCookie(null);
+      setAdminTokens(null, null);
+      setStoredAccessToken(null);
     } finally {
       setIsLoading(false);
     }
   };
 
   const login = async (data: LoginData): Promise<UserProfile | null> => {
-    let resolvedUser: any = null;
-
     try {
       const result = await adminLogin(data.email, data.password);
+      const resolvedUser = result?.user;
 
-      if (result?.accessToken && result?.user) {
-        resolvedUser = result.user;
+      if (resolvedUser && (resolvedUser.id || resolvedUser.email)) {
         setUser(resolvedUser);
-        setStoredAccessToken(result.accessToken);
-        await storeToken("access_token", result.accessToken);
-        if (result.refreshToken) {
-          await storeToken("refresh_token", result.refreshToken);
+
+        if (result.accessToken) {
+          setStoredAccessToken(result.accessToken);
+          await storeToken("access_token", result.accessToken);
+          if (result.refreshToken) {
+            await storeToken("refresh_token", result.refreshToken);
+          }
         }
+
+        const cookie = getSessionCookie();
+        if (cookie) {
+          await storeToken("session_cookie", cookie);
+        }
+
         return resolvedUser as UserProfile;
       }
 
-      if (result?.user) {
-        resolvedUser = result.user;
-        setUser(resolvedUser);
-      } else if ((result as any)?.id) {
-        resolvedUser = result as any;
-        setUser(resolvedUser);
-      }
-
-      if (resolvedUser) return resolvedUser as UserProfile;
-    } catch {}
-
-    try {
-      const result = await authApi.login(data);
-      if (result?.user) {
-        resolvedUser = result.user;
-      } else if ((result as any)?.id) {
-        resolvedUser = result as any;
-      }
-      if (resolvedUser) setUser(resolvedUser);
-      const cookie = getSessionCookie();
-      if (cookie) {
-        await storeToken("session_cookie", cookie);
-      }
-      return resolvedUser as UserProfile | null;
+      throw new Error("Réponse de connexion invalide");
     } catch (error) {
       console.error("Login error:", error instanceof Error ? error.message : error);
       throw error;
@@ -229,7 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       if (storedAccessToken) {
         const { adminApiCall } = require("./admin-api");
-        const userData = await adminApiCall("/api/mobile/auth/me");
+        const userData = await adminApiCall("/api/auth/user");
         if (userData && (userData.id || userData.email)) {
           setUser(userData);
           return;
@@ -263,7 +262,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setStoredAccessToken(savedAccessToken);
           try {
             const { adminApiCall } = require("./admin-api");
-            const userData = await adminApiCall("/api/mobile/auth/me");
+            const userData = await adminApiCall("/api/auth/user");
             if (userData && (userData.id || userData.email)) {
               setUser(userData);
               return true;

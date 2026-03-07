@@ -107,7 +107,7 @@ export default function NewQuoteScreen() {
       formData.append("requestDetails", notes.trim() || "Demande via application mobile");
       formData.append("vehicleInfo", JSON.stringify({ notes }));
 
-      await apiCall("/api/mobile/quotes", { method: "POST", body: formData, isFormData: true });
+      await apiCall("/api/quotes", { method: "POST", body: formData, isFormData: true });
 
       if (Platform.OS !== "web") Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showAlert({

@@ -400,7 +400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         redirect: "manual",
       });
 
-      let capturedCookie: string | null = null;
+      const allCookieParts: string[] = [];
       response.headers.forEach((value, key) => {
         const lk = key.toLowerCase();
         if (lk === "transfer-encoding" || lk === "content-encoding" || lk === "content-length") return;
@@ -408,17 +408,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
           res.appendHeader("set-cookie", value);
           const cookiePart = value.split(";")[0].trim();
           if (cookiePart && !cookiePart.startsWith("XSRF-TOKEN") && !cookiePart.startsWith("csrf")) {
-            capturedCookie = cookiePart;
+            allCookieParts.push(cookiePart);
           }
           return;
         }
         res.setHeader(key, value);
       });
 
-      if (capturedCookie) {
-        const cookie = capturedCookie as string;
-        console.log(`[LOGIN] Captured session cookie: ${cookie.substring(0, 40)}...`);
-        res.setHeader("X-Session-Cookie", cookie);
+      if (allCookieParts.length > 0) {
+        const allCookies = allCookieParts.join("; ");
+        console.log(`[LOGIN] Captured session cookies: ${allCookies.substring(0, 80)}...`);
+        res.setHeader("X-Session-Cookie", allCookies);
       }
 
       res.status(response.status);
@@ -959,17 +959,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const response = await fetch(targetUrl, fetchOptions);
 
+      const proxyCookieParts: string[] = [];
       response.headers.forEach((value, key) => {
         const lk = key.toLowerCase();
         if (lk === "transfer-encoding" || lk === "content-encoding" || lk === "content-length" || lk === "location") return;
         if (lk === "set-cookie") {
           res.appendHeader("set-cookie", value);
+          const cookiePart = value.split(";")[0].trim();
+          if (cookiePart && !cookiePart.startsWith("XSRF-TOKEN") && !cookiePart.startsWith("csrf")) {
+            proxyCookieParts.push(cookiePart);
+          }
           return;
         }
         if (lk !== "content-type") {
           res.setHeader(key, value);
         }
       });
+      if (proxyCookieParts.length > 0) {
+        res.setHeader("X-Session-Cookie", proxyCookieParts.join("; "));
+      }
 
       console.log(`[PROXY] ${req.method} /api${req.url} => ${response.status} ${response.statusText}`);
       const body = await response.arrayBuffer();
