@@ -86,12 +86,24 @@ export default function AdminDashboard() {
 
         <Text style={styles.sectionLabel}>Indicateurs clés</Text>
         <View style={styles.kpiGrid}>
-          <KPICard theme={theme} icon="cash-outline" color="#22C55E" label="CA du mois" value={formatCurrency(s.monthlyRevenue)} />
-          <KPICard theme={theme} icon="trending-up-outline" color="#3B82F6" label="CA total" value={formatCurrency(s.totalRevenue)} />
-          <KPICard theme={theme} icon="people-outline" color="#8B5CF6" label="Clients" value={String(s.totalClients || 0)} />
-          <KPICard theme={theme} icon="document-text-outline" color="#F59E0B" label="Devis en attente" value={String(s.pendingQuotes || 0)} />
-          <KPICard theme={theme} icon="alert-circle-outline" color="#EF4444" label="Factures impayées" value={String(s.pendingInvoices || 0)} />
-          <KPICard theme={theme} icon="calendar-outline" color="#06B6D4" label="RDV ce mois" value={String(s.reservationsThisMonth || 0)} />
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/invoices" as any)}>
+            <KPICard theme={theme} icon="cash-outline" color="#22C55E" label="CA du mois" value={formatCurrency(s.monthlyRevenue)} />
+          </Pressable>
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/invoices" as any)}>
+            <KPICard theme={theme} icon="trending-up-outline" color="#3B82F6" label="CA total" value={formatCurrency(s.totalRevenue)} />
+          </Pressable>
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/clients" as any)}>
+            <KPICard theme={theme} icon="people-outline" color="#8B5CF6" label="Clients" value={String(s.totalClients || 0)} />
+          </Pressable>
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/quotes" as any)}>
+            <KPICard theme={theme} icon="document-text-outline" color="#F59E0B" label="Devis en attente" value={String(s.pendingQuotes || 0)} />
+          </Pressable>
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/invoices" as any)}>
+            <KPICard theme={theme} icon="alert-circle-outline" color="#EF4444" label="Factures impayées" value={String(s.pendingInvoices || 0)} />
+          </Pressable>
+          <Pressable style={styles.kpiCardContainer} onPress={() => router.push("/(admin)/(tabs)/reservations" as any)}>
+            <KPICard theme={theme} icon="calendar-outline" color="#06B6D4" label="RDV ce mois" value={String(s.reservationsThisMonth || 0)} />
+          </Pressable>
         </View>
 
         {revenueChart.length > 0 && (
@@ -233,7 +245,8 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   sectionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
   seeAll: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.primary },
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 24 },
-  kpiCard: { width: "48%", flexGrow: 1, backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 14, gap: 6 },
+  kpiCardContainer: { width: "48%", flexGrow: 1 },
+  kpiCard: { backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 14, gap: 6 },
   kpiIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   kpiValue: { fontSize: 22, fontFamily: "Inter_700Bold", color: theme.text },
   kpiLabel: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },

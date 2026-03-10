@@ -101,7 +101,8 @@ export default function ReservationFormScreen() {
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {
-      showAlert({ type: "error", title: "Erreur", message: err.message || "Impossible de sauvegarder.", buttons: [{ text: "OK", style: "primary" }] });
+      const errMsg = err?.response?.data?.error || err?.message || "Impossible de sauvegarder la réservation.";
+      showAlert({ type: "error", title: "Erreur", message: errMsg, buttons: [{ text: "OK", style: "primary" }] });
     } finally {
       setSaving(false);
     }

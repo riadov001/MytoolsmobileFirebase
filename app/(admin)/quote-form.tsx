@@ -72,6 +72,10 @@ export default function QuoteFormScreen() {
       showAlert({ type: "error", title: "Erreur", message: "Veuillez sélectionner un client.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
+    if (!priceExcludingTax || parseFloat(priceExcludingTax) <= 0) {
+      showAlert({ type: "error", title: "Erreur", message: "Le montant HT doit être supérieur à 0.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
     setSaving(true);
     try {
       const ht = parseFloat(priceExcludingTax) || 0;
@@ -80,7 +84,7 @@ export default function QuoteFormScreen() {
       const body = {
         clientId: parseInt(clientId),
         status,
-        quoteAmount: parseFloat(quoteAmount) || 0,
+        quoteAmount: ht + taxAmount,
         priceExcludingTax: ht,
         taxRate: rate,
         taxAmount,
@@ -99,7 +103,8 @@ export default function QuoteFormScreen() {
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {
-      showAlert({ type: "error", title: "Erreur", message: err.message || "Impossible de sauvegarder.", buttons: [{ text: "OK", style: "primary" }] });
+      const errMsg = err?.response?.data?.error || err?.message || "Impossible de sauvegarder le devis.";
+      showAlert({ type: "error", title: "Erreur", message: errMsg, buttons: [{ text: "OK", style: "primary" }] });
     } finally {
       setSaving(false);
     }
