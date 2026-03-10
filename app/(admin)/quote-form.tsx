@@ -148,6 +148,7 @@ export default function QuoteFormScreen() {
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["admin-quotes"] });
+      if (isEdit) queryClient.invalidateQueries({ queryKey: ["admin-quote", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {

@@ -109,6 +109,7 @@ export default function ReservationFormScreen() {
       else await adminReservations.create(body);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["admin-reservations"] });
+      if (isEdit) queryClient.invalidateQueries({ queryKey: ["admin-reservation", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {

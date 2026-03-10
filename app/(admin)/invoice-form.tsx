@@ -130,16 +130,17 @@ export default function InvoiceFormScreen() {
         status,
         amount: totals.ttc,
         priceExcludingTax: totals.ht,
+        taxRate: items.length > 0 ? parseFloat(items[0].taxRate) || 20 : 20,
         taxAmount: totals.tax,
         paymentMethod,
         notes,
         items: builtItems,
       };
-      if (dueDate) body.dueDate = dueDate;
       if (isEdit) await adminInvoices.update(id, body);
       else await adminInvoices.create(body);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+      if (isEdit) queryClient.invalidateQueries({ queryKey: ["admin-invoice", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {
@@ -282,15 +283,6 @@ export default function InvoiceFormScreen() {
             </Pressable>
           ))}
         </View>
-
-        <Text style={styles.label}>Date d'échéance (AAAA-MM-JJ)</Text>
-        <TextInput
-          style={styles.input}
-          value={dueDate}
-          onChangeText={setDueDate}
-          placeholder="2026-04-15"
-          placeholderTextColor={theme.textTertiary}
-        />
 
         <Text style={styles.label}>Moyen de paiement</Text>
         <View style={styles.chipRow}>

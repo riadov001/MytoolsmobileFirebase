@@ -88,6 +88,7 @@ export default function ClientFormScreen() {
       else await adminClients.create(body);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      if (isEdit) queryClient.invalidateQueries({ queryKey: ["admin-client", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       router.back();
     } catch (err: any) {
