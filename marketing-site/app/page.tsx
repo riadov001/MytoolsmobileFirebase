@@ -11,6 +11,7 @@ import ContactForm from "@/components/ContactForm";
 import CTA from "@/components/CTA";
 import ComingSoon from "@/components/ComingSoon";
 import Footer from "@/components/Footer";
+import ScrollToTop from "@/components/ScrollToTop";
 
 export default function HomePage() {
   return (
@@ -26,6 +27,7 @@ export default function HomePage() {
       <CTA />
       <ComingSoon />
       <Footer />
+      <ScrollToTop />
     </main>
   );
 }

@@ -145,7 +145,7 @@ export default function FuturisticFeatures() {
   const mod = modules[active];
 
   return (
-    <section className="relative py-20 md:py-32 px-4 md:px-8 overflow-hidden">
+    <section id="architecture" className="relative py-20 md:py-32 px-4 md:px-8 overflow-hidden">
       <div className="absolute inset-0 bg-grid opacity-20" />
       <div
         className="absolute inset-0 transition-all duration-700 pointer-events-none"
