@@ -3,6 +3,24 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+const quoteItems = [
+  { title: "Vidange + révision", sub: "Martin Dupont", badge: "Approuvé", badgeClass: "bg-green-500/20 text-green-400" },
+  { title: "Remplacement freins", sub: "Sophie Leroy", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
+  { title: "Diagnostic moteur", sub: "Pierre Bernard", badge: "Terminé", badgeClass: "bg-blue-500/20 text-blue-400" },
+];
+
+const invoiceItems = [
+  { title: "FAC-2024-087", sub: "1 240 €", badge: "Payée", badgeClass: "bg-green-500/20 text-green-400" },
+  { title: "FAC-2024-088", sub: "890 €", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
+  { title: "FAC-2024-085", sub: "2 100 €", badge: "En retard", badgeClass: "bg-red-500/20 text-red-400" },
+];
+
+const clientItems = [
+  { title: "Martin Dupont", sub: "martin@email.fr", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
+  { title: "Sophie Leroy", sub: "s.leroy@gmail.com", badge: "Client", badgeClass: "bg-dark-border text-text-tertiary" },
+  { title: "Garage Renault", sub: "contact@renault.eu", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
+];
+
 const screens = [
   {
     id: "dashboard",
@@ -224,21 +242,3 @@ function ListPreview({ icon, title, items }: { icon: string; title: string; item
     </div>
   );
 }
-
-const quoteItems = [
-  { title: "Vidange + révision", sub: "Martin Dupont", badge: "Approuvé", badgeClass: "bg-green-500/20 text-green-400" },
-  { title: "Remplacement freins", sub: "Sophie Leroy", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
-  { title: "Diagnostic moteur", sub: "Pierre Bernard", badge: "Terminé", badgeClass: "bg-blue-500/20 text-blue-400" },
-];
-
-const invoiceItems = [
-  { title: "FAC-2024-087", sub: "1 240 €", badge: "Payée", badgeClass: "bg-green-500/20 text-green-400" },
-  { title: "FAC-2024-088", sub: "890 €", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
-  { title: "FAC-2024-085", sub: "2 100 €", badge: "En retard", badgeClass: "bg-red-500/20 text-red-400" },
-];
-
-const clientItems = [
-  { title: "Martin Dupont", sub: "martin@email.fr", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
-  { title: "Sophie Leroy", sub: "s.leroy@gmail.com", badge: "Client", badgeClass: "bg-dark-border text-text-tertiary" },
-  { title: "Garage Renault", sub: "contact@renault.eu", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
-];

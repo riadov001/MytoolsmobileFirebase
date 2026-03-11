@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>OG Image Generator — MyTools Admin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Michroma&family=Inter:wght@400;600;700&display=swap');
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    width: 1200px; height: 630px;
+    background: #0A0A0A;
+    font-family: 'Inter', sans-serif;
+    overflow: hidden;
+    position: relative;
+  }
+  .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+  .glow {
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 900px 600px at 30% 50%, rgba(220,38,38,0.18) 0%, transparent 70%);
+  }
+  .content {
+    position: relative; z-index: 10;
+    display: flex; align-items: center;
+    height: 100%; padding: 0 80px;
+    gap: 80px;
+  }
+  .left { flex: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(220,38,38,0.1);
+    border: 1px solid rgba(220,38,38,0.3);
+    border-radius: 999px; padding: 6px 14px;
+    margin-bottom: 32px;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: #DC2626; }
+  .badge-text { color: #DC2626; font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+  .brand {
+    font-family: 'Michroma', sans-serif;
+    font-size: 72px; line-height: 1;
+    color: #F0F0F0; margin-bottom: 12px;
+  }
+  .brand span { color: #DC2626; }
+  .admin { font-family: 'Michroma', sans-serif; font-size: 32px; color: #A8A8A8; letter-spacing: 0.3em; margin-bottom: 28px; }
+  .desc { font-size: 20px; color: #A8A8A8; line-height: 1.5; max-width: 480px; margin-bottom: 40px; }
+  .url { font-size: 16px; color: #666; }
+  .right {
+    width: 220px; height: 450px;
+    background: #161616; border: 1px solid #2A2A2A;
+    border-radius: 44px; overflow: hidden;
+    position: relative;
+    box-shadow: 0 40px 120px rgba(0,0,0,0.7), 0 0 60px rgba(220,38,38,0.1);
+  }
+  .phone-notch {
+    position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 80px; height: 18px;
+    background: #0A0A0A; border-radius: 0 0 14px 14px; z-index: 10;
+  }
+  .phone-content { padding: 28px 14px 14px; height: 100%; display: flex; flex-direction: column; gap: 10px; }
+  .ph-header { display: flex; align-items: center; gap: 8px; }
+  .ph-logo { width: 28px; height: 28px; background: #DC2626; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Michroma', sans-serif; font-size: 8px; color: white; }
+  .ph-name { font-size: 10px; font-weight: 700; color: #F0F0F0; }
+  .ph-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .ph-card { background: #1C1C1C; border: 1px solid #2A2A2A; border-radius: 12px; padding: 8px; }
+  .ph-label { font-size: 7px; color: #666; text-transform: uppercase; }
+  .ph-val { font-size: 11px; font-weight: 700; margin-top: 2px; }
+  .green { color: #22C55E; } .red { color: #EF4444; } .white { color: #F0F0F0; }
+  .ph-chart { background: #1C1C1C; border: 1px solid #2A2A2A; border-radius: 12px; padding: 8px; flex: 1; }
+  .bars { display: flex; align-items: flex-end; gap: 4px; height: 50px; }
+  .bar { flex: 1; border-radius: 3px 3px 0 0; }
+</style>
+</head>
+<body>
+<div class="grid"></div>
+<div class="glow"></div>
+<div class="content">
+  <div class="left">
+    <div class="badge">
+      <div class="badge-dot"></div>
+      <span class="badge-text">Application Pro — Garages Partenaires</span>
+    </div>
+    <div class="brand">MY<span>TOOLS</span></div>
+    <div class="admin">A D M I N</div>
+    <p class="desc">La gestion complète de votre garage dans votre poche. Devis, factures, clients et rendez-vous — en temps réel.</p>
+    <div class="url">mytoolsgroup.eu</div>
+  </div>
+  <div class="right">
+    <div class="phone-notch"></div>
+    <div class="phone-content">
+      <div class="ph-header">
+        <div class="ph-logo">MT</div>
+        <div class="ph-name">Dashboard</div>
+      </div>
+      <div class="ph-grid">
+        <div class="ph-card"><div class="ph-label">CA Mois</div><div class="ph-val green">12 840 €</div></div>
+        <div class="ph-card"><div class="ph-label">Attente</div><div class="ph-val red">3 200 €</div></div>
+        <div class="ph-card"><div class="ph-label">Clients</div><div class="ph-val white">247</div></div>
+        <div class="ph-card"><div class="ph-label">RDV</div><div class="ph-val white">18</div></div>
+      </div>
+      <div class="ph-chart">
+        <div class="ph-label">6 mois</div>
+        <div class="bars" style="margin-top:6px">
+          <div class="bar" style="height:40%;background:rgba(220,38,38,0.3)"></div>
+          <div class="bar" style="height:65%;background:rgba(220,38,38,0.3)"></div>
+          <div class="bar" style="height:50%;background:rgba(220,38,38,0.3)"></div>
+          <div class="bar" style="height:80%;background:rgba(220,38,38,0.3)"></div>
+          <div class="bar" style="height:70%;background:rgba(220,38,38,0.3)"></div>
+          <div class="bar" style="height:100%;background:linear-gradient(180deg,#DC2626 0%,rgba(220,38,38,0.3) 100%)"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
