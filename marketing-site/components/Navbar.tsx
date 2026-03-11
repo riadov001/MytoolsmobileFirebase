@@ -6,12 +6,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 const navLinks = [
-  { href: "/#features",      label: "Fonctionnalités" },
-  { href: "/#architecture",  label: "Architecture" },
-  { href: "/#roadmap",       label: "Roadmap" },
-  { href: "/#how-it-works",  label: "Comment ça marche" },
-  { href: "/#contact",       label: "Accès" },
-  { href: "/support",        label: "Support" },
+  { href: "/#screenshots", label: "L'interface" },
+  { href: "/#features",    label: "Modules" },
+  { href: "/#roadmap",     label: "Roadmap" },
+  { href: "/#access",      label: "Accès" },
+  { href: "/support",      label: "Support" },
 ];
 
 export default function Navbar() {
@@ -80,7 +79,7 @@ export default function Navbar() {
             PWA
           </a>
           <a
-            href="/#contact"
+            href="/#access"
             onClick={(e) => handleClick(e, "/#contact")}
             className="font-michroma text-[9px] tracking-widest uppercase text-white bg-[#DC2626] hover:bg-[#B91C1C] px-4 py-2 rounded-lg transition-all"
           >
@@ -103,7 +102,7 @@ export default function Navbar() {
         </div>
         <div className="hidden md:flex lg:hidden items-center gap-2 shrink-0">
           <a
-            href="/#contact"
+            href="/#access"
             onClick={(e) => handleClick(e, "/#contact")}
             className="font-michroma text-[9px] tracking-widest uppercase text-white bg-[#DC2626] px-3 py-2 rounded-lg"
           >
@@ -158,7 +157,7 @@ export default function Navbar() {
                 PWA Live →
               </a>
               <a
-                href="/#contact"
+                href="/#access"
                 className="flex-1 font-michroma text-[9px] tracking-widest uppercase text-center text-white bg-[#DC2626] px-3 py-3 rounded-lg"
                 onClick={(e) => { handleClick(e, "/#contact"); setMenuOpen(false); }}
               >

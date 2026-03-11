@@ -2,243 +2,189 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const quoteItems = [
-  { title: "Vidange + révision", sub: "Martin Dupont", badge: "Approuvé", badgeClass: "bg-green-500/20 text-green-400" },
-  { title: "Remplacement freins", sub: "Sophie Leroy", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
-  { title: "Diagnostic moteur", sub: "Pierre Bernard", badge: "Terminé", badgeClass: "bg-blue-500/20 text-blue-400" },
-];
-
-const invoiceItems = [
-  { title: "FAC-2024-087", sub: "1 240 €", badge: "Payée", badgeClass: "bg-green-500/20 text-green-400" },
-  { title: "FAC-2024-088", sub: "890 €", badge: "En attente", badgeClass: "bg-yellow-500/20 text-yellow-400" },
-  { title: "FAC-2024-085", sub: "2 100 €", badge: "En retard", badgeClass: "bg-red-500/20 text-red-400" },
-];
-
-const clientItems = [
-  { title: "Martin Dupont", sub: "martin@email.fr", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
-  { title: "Sophie Leroy", sub: "s.leroy@gmail.com", badge: "Client", badgeClass: "bg-dark-border text-text-tertiary" },
-  { title: "Garage Renault", sub: "contact@renault.eu", badge: "Pro", badgeClass: "bg-blue-500/20 text-blue-400" },
-];
+import Image from "next/image";
 
 const screens = [
   {
+    id: "login",
+    n: "01",
+    label: "Connexion",
+    img: "/screenshots/login.png",
+    caption: "Authentification sécurisée — réservée aux administrateurs.",
+  },
+  {
     id: "dashboard",
+    n: "02",
     label: "Dashboard",
-    title: "Pilotez votre activité en temps réel",
-    description:
-      "Vue d'ensemble instantanée : CA du mois, revenus en attente, nombre de clients et rendez-vous, graphique des 6 derniers mois.",
-    preview: <DashboardPreview />,
+    img: "/screenshots/dashboard.png",
+    caption: "Tous vos indicateurs clés en un coup d'œil.",
   },
   {
-    id: "quotes",
+    id: "reservations",
+    n: "03",
+    label: "Rendez-vous",
+    img: "/screenshots/reservations.png",
+    caption: "Agenda mensuel et liste. Chaque rendez-vous maîtrisé.",
+  },
+  {
+    id: "services",
+    n: "04",
+    label: "Services",
+    img: "/screenshots/services.png",
+    caption: "Votre catalogue de prestations, synchronisé en temps réel.",
+  },
+  {
+    id: "devis",
+    n: "05",
     label: "Devis",
-    title: "Créez et gérez vos devis en 30 secondes",
-    description:
-      "Liste complète avec statuts colorés, création rapide avec photo, changement de statut en un tap.",
-    preview: <ListPreview icon="📄" title="Devis" items={quoteItems} />,
-  },
-  {
-    id: "invoices",
-    label: "Factures",
-    title: "Suivez chaque facture jusqu'au paiement",
-    description:
-      "Tracking complet payé/en attente/en retard/annulé. Plus jamais une facture oubliée.",
-    preview: <ListPreview icon="🧾" title="Factures" items={invoiceItems} />,
-  },
-  {
-    id: "clients",
-    label: "Clients",
-    title: "Votre base clients toujours à portée de main",
-    description:
-      "Recherchez, créez et modifiez des fiches clients directement depuis votre téléphone.",
-    preview: <ListPreview icon="👥" title="Clients" items={clientItems} />,
+    img: "/screenshots/devis.png",
+    caption: "Modifiez un devis depuis le terrain — en quelques secondes.",
   },
 ];
 
 export default function Screenshots() {
-  const [active, setActive] = useState(0);
+  const [active, setActive] = useState(1);
 
   return (
-    <section id="screenshots" className="relative py-32 overflow-hidden">
-      <div className="absolute inset-0 bg-grid opacity-30" />
-      <div className="max-w-7xl mx-auto px-6 relative z-10">
+    <section id="screenshots" className="py-24 md:py-36 border-t border-[#1A1A1A]">
+      <div className="max-w-7xl mx-auto px-4 md:px-8">
+
+        {/* Header */}
         <motion.div
-          initial={{ opacity: 0, y: 24 }}
+          initial={{ opacity: 0, y: 16 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
+          className="mb-16 md:mb-24 flex flex-col md:flex-row md:items-end md:justify-between gap-6"
         >
-          <p className="text-brand-red font-michroma text-xs tracking-widest uppercase mb-4">
-            Aperçu
-          </p>
-          <h2 className="text-4xl md:text-5xl font-bold text-text-primary mb-6">
-            L'interface que vos équipes vont adorer
-          </h2>
-          <p className="text-text-secondary text-lg max-w-xl mx-auto">
-            Conçue pour être utilisée d'une main, sous n'importe quelle luminosité.
+          <div>
+            <p className="font-michroma text-[#DC2626] text-[9px] tracking-widest uppercase mb-3">Captures réelles</p>
+            <h2 className="font-michroma text-3xl md:text-5xl lg:text-6xl text-white tracking-widest uppercase leading-none">
+              L'interface.
+            </h2>
+          </div>
+          <p className="font-michroma text-[#444] text-[10px] tracking-widest uppercase max-w-xs md:text-right">
+            Captures d'écran réelles de l'application en production.
           </p>
         </motion.div>
 
-        <div className="flex flex-wrap justify-center gap-2 mb-12">
-          {screens.map((screen, i) => (
-            <button
-              key={screen.id}
-              onClick={() => setActive(i)}
-              className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                i === active
-                  ? "bg-brand-red text-white"
-                  : "bg-dark-surface border border-dark-border text-text-secondary hover:text-text-primary"
-              }`}
-            >
-              {screen.label}
-            </button>
-          ))}
-        </div>
+        {/* Main layout */}
+        <div className="flex flex-col lg:flex-row gap-10 lg:gap-20 items-start">
 
-        <div className="flex flex-col lg:flex-row items-center gap-16">
-          <motion.div
-            key={active}
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="flex-1 max-w-md"
-          >
-            <h3 className="text-2xl md:text-3xl font-bold text-text-primary mb-4">
-              {screens[active].title}
-            </h3>
-            <p className="text-text-secondary leading-relaxed text-lg mb-8">
-              {screens[active].description}
-            </p>
-
-            <div className="flex flex-wrap gap-3">
-              {["Temps réel", "iOS & Android", "Synchronisé"].map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center gap-1.5 bg-dark-surface border border-dark-border text-text-secondary text-xs px-3 py-1.5 rounded-full"
+          {/* Left — nav list */}
+          <div className="lg:w-64 shrink-0">
+            <div className="flex lg:flex-col gap-2 flex-wrap">
+              {screens.map((s, i) => (
+                <button
+                  key={s.id}
+                  onClick={() => setActive(i)}
+                  className={`flex items-center gap-4 text-left w-full py-4 border-b border-[#1A1A1A] last:border-b-0 transition-all group ${
+                    i === active ? "" : "opacity-40 hover:opacity-70"
+                  }`}
                 >
-                  <span className="w-1 h-1 rounded-full bg-brand-red" />
-                  {tag}
-                </span>
+                  <span className={`font-michroma text-[9px] tracking-widest shrink-0 transition-colors ${i === active ? "text-[#DC2626]" : "text-[#333]"}`}>
+                    {s.n}
+                  </span>
+                  <span className={`font-michroma text-xs tracking-widest uppercase transition-colors ${i === active ? "text-white" : "text-[#555]"}`}>
+                    {s.label}
+                  </span>
+                  {i === active && (
+                    <motion.div layoutId="activeLine" className="hidden lg:block ml-auto w-4 h-px bg-[#DC2626]" />
+                  )}
+                </button>
               ))}
             </div>
-          </motion.div>
 
-          <div className="flex-1 flex justify-center">
+            {/* Caption */}
+            <AnimatePresence mode="wait">
+              <motion.p
+                key={active}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.25 }}
+                className="font-michroma text-[#444] text-[10px] tracking-wide leading-relaxed mt-8 hidden lg:block"
+              >
+                {screens[active].caption}
+              </motion.p>
+            </AnimatePresence>
+
+            {/* Arrows */}
+            <div className="hidden lg:flex items-center gap-3 mt-8">
+              <button
+                onClick={() => setActive((a) => (a - 1 + screens.length) % screens.length)}
+                className="w-9 h-9 border border-[#2A2A2A] rounded-lg flex items-center justify-center font-michroma text-[#555] hover:text-white hover:border-[#444] transition-all text-sm"
+              >
+                ←
+              </button>
+              <span className="font-michroma text-[#333] text-[9px] tracking-widest">
+                {active + 1} / {screens.length}
+              </span>
+              <button
+                onClick={() => setActive((a) => (a + 1) % screens.length)}
+                className="w-9 h-9 border border-[#2A2A2A] rounded-lg flex items-center justify-center font-michroma text-[#555] hover:text-white hover:border-[#444] transition-all text-sm"
+              >
+                →
+              </button>
+            </div>
+          </div>
+
+          {/* Right — phone frame */}
+          <div className="flex-1 flex justify-center lg:justify-end">
             <div className="relative">
-              <div className="absolute inset-0 bg-brand-red/10 blur-3xl rounded-full scale-75" />
-              <div className="relative w-64 h-[520px] bg-dark-surface border border-dark-border rounded-[44px] overflow-hidden shadow-2xl shadow-black/60">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-dark-base rounded-b-2xl z-10" />
+              <div className="absolute inset-0 bg-[#DC2626]/8 blur-3xl rounded-full pointer-events-none scale-75" />
+              <div
+                className="relative w-[200px] sm:w-[220px] md:w-[250px] bg-[#0A0A0A] rounded-[44px] overflow-hidden border border-[#1E1E1E] shadow-2xl shadow-black"
+                style={{ aspectRatio: "9/19.5" }}
+              >
+                {/* Notch */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-5 bg-[#0A0A0A] rounded-b-xl z-20" />
+
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={active}
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, scale: 1.02 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.98 }}
                     transition={{ duration: 0.3 }}
-                    className="h-full"
+                    className="absolute inset-0"
                   >
-                    {screens[active].preview}
+                    <Image
+                      src={screens[active].img}
+                      alt={screens[active].label}
+                      fill
+                      className="object-cover"
+                      priority
+                    />
                   </motion.div>
                 </AnimatePresence>
               </div>
             </div>
           </div>
+
         </div>
+
+        {/* Mobile caption + arrows */}
+        <div className="lg:hidden mt-8 flex items-start justify-between gap-4">
+          <p className="font-michroma text-[#444] text-[10px] tracking-wide leading-relaxed flex-1">
+            {screens[active].caption}
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setActive((a) => (a - 1 + screens.length) % screens.length)}
+              className="w-8 h-8 border border-[#2A2A2A] rounded-lg flex items-center justify-center font-michroma text-[#555] hover:text-white transition-all text-xs"
+            >
+              ←
+            </button>
+            <button
+              onClick={() => setActive((a) => (a + 1) % screens.length)}
+              className="w-8 h-8 border border-[#2A2A2A] rounded-lg flex items-center justify-center font-michroma text-[#555] hover:text-white transition-all text-xs"
+            >
+              →
+            </button>
+          </div>
+        </div>
+
       </div>
     </section>
-  );
-}
-
-function DashboardPreview() {
-  return (
-    <div className="p-4 pt-10 h-full flex flex-col gap-3">
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 bg-brand-red rounded-lg flex items-center justify-center">
-          <span className="font-michroma text-white text-xs">MT</span>
-        </div>
-        <div>
-          <div className="text-text-tertiary text-xs">Bonjour,</div>
-          <div className="text-text-primary font-bold text-xs">Admin</div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { l: "CA Mois", v: "12 840 €", c: "text-green-400" },
-          { l: "En attente", v: "3 200 €", c: "text-red-400" },
-          { l: "Clients", v: "247", c: "text-text-primary" },
-          { l: "RDV", v: "18", c: "text-text-primary" },
-        ].map((k) => (
-          <div key={k.l} className="bg-dark-elevated rounded-xl p-2.5 border border-dark-border">
-            <div className="text-text-tertiary text-xs">{k.l}</div>
-            <div className={`font-bold text-sm mt-0.5 ${k.c}`}>{k.v}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-dark-elevated rounded-xl p-3 border border-dark-border flex-1">
-        <div className="text-text-tertiary text-xs mb-2">6 derniers mois</div>
-        <div className="flex items-end gap-1 h-16">
-          {[40, 65, 50, 80, 70, 100].map((h, i) => (
-            <div
-              key={i}
-              className="flex-1 rounded-t"
-              style={{
-                height: `${h}%`,
-                background: i === 5
-                  ? "linear-gradient(180deg, #DC2626 0%, rgba(220,38,38,0.3) 100%)"
-                  : "rgba(220,38,38,0.25)",
-              }}
-            />
-          ))}
-        </div>
-      </div>
-
-      <div className="flex justify-around pt-1 pb-2 border-t border-dark-border">
-        {["📊", "📄", "🧾", "📅", "👥"].map((icon, i) => (
-          <div key={i} className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${i === 0 ? "bg-brand-red" : ""}`}>
-            {icon}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ListPreview({ icon, title, items }: { icon: string; title: string; items: any[] }) {
-  return (
-    <div className="p-4 pt-10 h-full flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <span className="text-text-primary font-bold text-sm">{title}</span>
-        <div className="w-7 h-7 bg-brand-red rounded-lg flex items-center justify-center">
-          <span className="text-white text-sm">+</span>
-        </div>
-      </div>
-      <div className="flex-1 flex flex-col gap-2">
-        {items.map((item, i) => (
-          <div key={i} className="bg-dark-elevated rounded-xl p-3 border border-dark-border flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand-red/10 rounded-lg flex items-center justify-center text-sm">
-              {icon}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-text-primary text-xs font-semibold truncate">{item.title}</div>
-              <div className="text-text-tertiary text-xs">{item.sub}</div>
-            </div>
-            <div className={`text-xs font-semibold px-2 py-0.5 rounded-full ${item.badgeClass}`}>
-              {item.badge}
-            </div>
-          </div>
-        ))}
-      </div>
-      <div className="flex justify-around pt-1 pb-2 border-t border-dark-border">
-        {["📊", "📄", "🧾", "📅", "👥"].map((ic, i) => (
-          <div key={i} className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${ic === icon ? "bg-brand-red" : ""}`}>
-            {ic}
-          </div>
-        ))}
-      </div>
-    </div>
   );
 }

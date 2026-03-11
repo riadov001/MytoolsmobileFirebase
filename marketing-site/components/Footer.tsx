@@ -35,9 +35,9 @@ export default function Footer() {
               <h4 className="font-michroma text-white text-[10px] tracking-[0.3em] uppercase mb-4">Produit</h4>
               <ul className="flex flex-col gap-3">
                 {[
-                  { href: "/#features", label: "Fonctionnalités" },
-                  { href: "/#how-it-works", label: "Comment ça marche" },
-                  { href: "/#contact", label: "Demander l'accès" },
+                  { href: "/#screenshots", label: "L'interface" },
+                  { href: "/#features", label: "Modules" },
+                  { href: "/#access", label: "Demander l'accès" },
                 ].map((l) => (
                   <li key={l.label}>
                     <a href={l.href} className="font-michroma text-[#666] hover:text-white text-[10px] tracking-widest uppercase transition-colors">
