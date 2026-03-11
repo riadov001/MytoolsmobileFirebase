@@ -13,7 +13,7 @@ export default function Hero() {
         <div className="flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
 
           {/* ── LEFT: Text ── */}
-          <div className="flex-1 w-full flex flex-col items-center lg:items-start text-center lg:text-left">
+          <div className="flex-1 w-full flex flex-col items-center text-center">
 
             {/* PWA badge */}
             <motion.a
@@ -36,7 +36,7 @@ export default function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="font-michroma text-[2.8rem] sm:text-6xl md:text-7xl lg:text-8xl text-white leading-none tracking-[0.1em] text-center lg:text-left w-full"
+              className="font-michroma text-3xl sm:text-4xl text-white leading-none tracking-[0.15em] text-center w-full"
             >
               MY<span className="text-[#DC2626]">TOOLS</span>
             </motion.h1>
@@ -49,7 +49,7 @@ export default function Hero() {
               className="flex items-center gap-3 mb-6 mt-1"
             >
               <div className="h-px w-10 bg-[#DC2626] speedbar" />
-              <span className="font-michroma text-lg sm:text-xl md:text-2xl text-[#A8A8A8] tracking-[0.25em] uppercase">
+              <span className="font-michroma text-sm sm:text-base md:text-lg text-[#A8A8A8] tracking-[0.3em] uppercase">
                 ADMIN
               </span>
             </motion.div>
@@ -78,7 +78,7 @@ export default function Hero() {
                 "Gérez depuis n'importe où.",
                 "Conçu pour les pros de l'automobile.",
               ].map((line) => (
-                <div key={line} className="flex items-center gap-2.5 justify-center lg:justify-start">
+                <div key={line} className="flex items-center gap-2.5 justify-center">
                   <div className="w-3 h-px bg-[#DC2626] shrink-0" />
                   <span className="font-michroma text-[#555] text-[9px] sm:text-[10px] tracking-widest uppercase">{line}</span>
                 </div>
@@ -121,7 +121,7 @@ export default function Hero() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.55 }}
-              className="flex flex-wrap items-center gap-2 justify-center lg:justify-start"
+              className="flex flex-wrap items-center gap-2 justify-center"
             >
               <span className="font-michroma text-[#444] text-[9px] tracking-widest uppercase">Bientôt sur</span>
               <StoreBadge icon="🍎" label="App Store" />

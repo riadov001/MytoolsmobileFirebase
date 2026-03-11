@@ -5,6 +5,6 @@
   "/robots.txt/route": "app/robots.txt/route.js",
   "/sitemap.xml/route": "app/sitemap.xml/route.js",
   "/opengraph-image/route": "app/opengraph-image/route.js",
-  "/support/page": "app/support/page.js",
-  "/privacy/page": "app/privacy/page.js"
+  "/privacy/page": "app/privacy/page.js",
+  "/support/page": "app/support/page.js"
 }
