@@ -1,6 +1,9 @@
 import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 
+const REQUEST_TIMEOUT_MS = 15000;
+const RETRY_DELAY_MS = 500;
+
 const getApiBase = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
@@ -22,6 +25,52 @@ const API_BASE = getApiBase();
 
 export function getBackendUrl() {
   return API_BASE;
+}
+
+function isNetworkError(err: any): boolean {
+  if (err?.name === "AbortError") return true;
+  if (err?.name === "TypeError" && err?.message?.includes("Network")) return true;
+  if (err?.message?.includes("fetch") || err?.message?.includes("network")) return true;
+  return false;
+}
+
+async function fetchWithTimeout(
+  url: string,
+  options: any,
+  useGlobal = false,
+  timeoutMs = REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const fetchFn = useGlobal ? globalThis.fetch : expoFetch;
+    const res = await fetchFn(url, { ...options, signal: controller.signal });
+    return res;
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error("Le serveur met trop de temps à répondre. Vérifiez votre connexion et réessayez.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function fetchWithRetry(
+  url: string,
+  options: any,
+  useGlobal = false,
+  retries = 1
+): Promise<Response> {
+  try {
+    return await fetchWithTimeout(url, options, useGlobal);
+  } catch (err: any) {
+    if (retries > 0 && isNetworkError(err)) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      return fetchWithRetry(url, options, useGlobal, retries - 1);
+    }
+    throw err;
+  }
 }
 
 interface ApiOptions {
@@ -67,10 +116,6 @@ export async function apiCall<T = any>(
 
   if (sessionCookie) {
     fetchHeaders["Cookie"] = sessionCookie;
-    // On web, we also want to allow the browser to manage cookies if possible
-    if (Platform.OS === "web") {
-      // expo-fetch on web might need credentials: "include" to send/receive cookies
-    }
   }
 
   const url = `${API_BASE}${endpoint}`;
@@ -83,12 +128,12 @@ export async function apiCall<T = any>(
       formHeaders["Cookie"] = sessionCookie;
     }
 
-    res = await globalThis.fetch(url, {
+    res = await fetchWithRetry(url, {
       method,
       headers: formHeaders,
       body: body,
       credentials: "include" as const,
-    });
+    }, true);
   } else {
     const fetchOptions: any = {
       method,
@@ -102,7 +147,7 @@ export async function apiCall<T = any>(
         fetchOptions.body = String(body);
       }
     }
-    res = await expoFetch(url, fetchOptions);
+    res = await fetchWithRetry(url, fetchOptions, false);
   }
 
   const xSessionCookie = res.headers.get("x-session-cookie");
@@ -143,14 +188,6 @@ export async function apiCall<T = any>(
   }
   try {
     const parsed = JSON.parse(text);
-    const debugEndpoints = ["/api/invoices", "/api/quotes", "/api/reservations"];
-    if (debugEndpoints.some(ep => endpoint.startsWith(ep))) {
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        console.log(`[API DEBUG] ${endpoint} => Array[${parsed.length}], first keys:`, Object.keys(parsed[0]), "sample:", JSON.stringify(parsed[0]).substring(0, 500));
-      } else if (parsed && typeof parsed === "object") {
-        console.log(`[API DEBUG] ${endpoint} => Object keys:`, Object.keys(parsed), "sample:", JSON.stringify(parsed).substring(0, 500));
-      }
-    }
     return parsed as T;
   } catch {
     return {} as T;
@@ -514,4 +551,3 @@ export const supportApi = {
     }
   },
 };
-

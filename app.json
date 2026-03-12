@@ -16,6 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mytools.app",
+      "buildNumber": "1",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -25,13 +26,13 @@
         "NSPhotoLibraryAddUsageDescription": "MyTools Admin peut enregistrer des photos dans votre bibliothèque.",
         "NSFaceIDUsageDescription": "MyTools Admin utilise Face ID pour sécuriser l'accès à votre compte administrateur.",
         "NSUserTrackingUsageDescription": "MyTools Admin n'effectue aucun suivi publicitaire. Aucune donnée n'est partagée avec des tiers à des fins commerciales.",
-        "NSMicrophoneUsageDescription": "MyTools Admin peut accéder au microphone lors de la prise de vidéo pour les demandes de service.",
         "NSLocationWhenInUseUsageDescription": "MyTools Admin n'utilise pas votre localisation.",
         "ITSAppUsesNonExemptEncryption": "NO"
       }
     },
     "android": {
       "package": "com.mytools.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#0A0A0A",
         "foregroundImage": "./assets/images/logo_new.png"
@@ -45,11 +46,12 @@
     "web": {
       "favicon": "./assets/images/logo_new.png"
     },
+    "privacyPolicyUrl": "https://www.mytoolsgroup.eu/privacy",
     "plugins": [
       [
         "expo-router",
         {
-          "origin": "https://replit.com/"
+          "origin": "https://www.mytoolsgroup.eu"
         }
       ],
       "expo-font",
@@ -82,7 +84,7 @@
     },
     "extra": {
       "router": {
-        "origin": "https://replit.com/"
+        "origin": "https://www.mytoolsgroup.eu"
       },
       "eas": {
         "projectId": "45e48f45-e421-4f67-9d02-d84a678fdfc5"

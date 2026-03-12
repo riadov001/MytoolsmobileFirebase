@@ -29,14 +29,8 @@ export default function DeleteAccountScreen() {
 
     setLoading(true);
     try {
-      const response = await fetch(
-        `${process.env.EXPO_PUBLIC_DOMAIN || "http://localhost:5000"}/api/users/me`,
-        { method: "DELETE", credentials: "include" }
-      );
-
-      if (!response.ok) {
-        throw new Error("Impossible de supprimer le compte");
-      }
+      const { apiCall } = await import("@/lib/api");
+      await apiCall("/api/users/me", { method: "DELETE" });
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await logout();

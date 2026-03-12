@@ -172,6 +172,17 @@ server/
 - Reservation detail: "Modifier" and "Annuler" buttons removed
 - Reservation detail: "Refuser" button removed (only "Confirmer" remains for pending client action)
 
+## App Review Mode
+- **Environment variable**: `APP_REVIEW_MODE=true` enables the reviewer demo account bypass
+- **Demo credentials**: `review@testapp.com` / `Test123456` (admin role)
+- All admin CRUD endpoints return synthetic data when using the reviewer token
+- Disable by removing or setting `APP_REVIEW_MODE=false` in production after review
+- See `APP_REVIEW_NOTES.md` for full reviewer instructions
+
+## Network Resilience
+- `lib/api.ts` and `lib/admin-api.ts` use 15s `AbortController` timeout + 1 retry on network errors
+- User-friendly French error messages on timeout/unavailability
+
 ## Recent Changes
 - Feb 2026: Initial build of MyJantes mobile app
 - Feb 2026: Thème sombre complet (noir/rouge/blanc)

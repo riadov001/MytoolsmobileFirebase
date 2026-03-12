@@ -3,6 +3,9 @@ import { Platform } from "react-native";
 import { router } from "expo-router";
 import { getSessionCookie, setSessionCookie } from "./api";
 
+const REQUEST_TIMEOUT_MS = 15000;
+const RETRY_DELAY_MS = 500;
+
 const getApiBase = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
@@ -37,6 +40,41 @@ export function getAdminAccessToken() {
 
 export function setOnTokenExpired(cb: () => void) {
   onTokenExpired = cb;
+}
+
+function isNetworkError(err: any): boolean {
+  if (err?.name === "AbortError") return true;
+  if (err?.name === "TypeError" && err?.message?.includes("Network")) return true;
+  if (err?.message?.includes("fetch") || err?.message?.includes("network")) return true;
+  return false;
+}
+
+async function fetchWithTimeout(url: string, options: any, timeoutMs = REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await expoFetch(url, { ...options, signal: controller.signal });
+    return res;
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error("Le serveur met trop de temps à répondre. Vérifiez votre connexion et réessayez.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function fetchWithRetry(url: string, options: any, retries = 1): Promise<Response> {
+  try {
+    return await fetchWithTimeout(url, options);
+  } catch (err: any) {
+    if (retries > 0 && isNetworkError(err)) {
+      await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw err;
+  }
 }
 
 interface AdminApiOptions {
@@ -78,7 +116,7 @@ export async function adminApiCall<T = any>(
     fetchOptions.body = JSON.stringify(body);
   }
 
-  const res = await expoFetch(url, fetchOptions);
+  const res = await fetchWithRetry(url, fetchOptions);
 
   const xSessionCookie = res.headers.get("x-session-cookie");
   if (xSessionCookie) {
@@ -90,7 +128,7 @@ export async function adminApiCall<T = any>(
       const refreshed = await tryRefreshToken();
       if (refreshed) {
         fetchHeaders["Authorization"] = `Bearer ${accessToken}`;
-        const retryRes = await expoFetch(url, { ...fetchOptions, headers: fetchHeaders });
+        const retryRes = await fetchWithTimeout(url, { ...fetchOptions, headers: fetchHeaders });
         if (retryRes.ok) return parseResponse<T>(retryRes);
       }
     }
@@ -113,7 +151,7 @@ export async function adminApiCall<T = any>(
 async function tryRefreshToken(): Promise<boolean> {
   if (!refreshTokenValue) return false;
   try {
-    const res = await expoFetch(`${API_BASE}/api/mobile/refresh`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/mobile/refresh`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ refreshToken: refreshTokenValue }),
@@ -158,7 +196,7 @@ async function parseResponse<T>(res: Response): Promise<T> {
 }
 
 export async function adminLogin(email: string, password: string) {
-  const res = await expoFetch(`${API_BASE}/api/mobile/login`, {
+  const res = await fetchWithRetry(`${API_BASE}/api/mobile/login`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -189,7 +227,7 @@ export async function adminLogin(email: string, password: string) {
   if (!user?.id && !user?.email) {
     if (data.accessToken) {
       try {
-        const meRes = await expoFetch(`${API_BASE}/api/mobile/auth/me`, {
+        const meRes = await fetchWithTimeout(`${API_BASE}/api/mobile/auth/me`, {
           headers: { Authorization: `Bearer ${data.accessToken}`, Accept: "application/json" },
         });
         if (meRes.ok) user = await meRes.json();
@@ -198,7 +236,7 @@ export async function adminLogin(email: string, password: string) {
   }
 
   try {
-    const cookieRes = await expoFetch(`${API_BASE}/api/login`, {
+    const cookieRes = await fetchWithTimeout(`${API_BASE}/api/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ email, password }),
@@ -215,7 +253,7 @@ export async function adminLogin(email: string, password: string) {
 export async function adminGetMe(): Promise<any> {
   if (!accessToken) return null;
   try {
-    const res = await expoFetch(`${API_BASE}/api/mobile/auth/me`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/mobile/auth/me`, {
       headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/json" },
     });
     if (res.ok) return await res.json();
