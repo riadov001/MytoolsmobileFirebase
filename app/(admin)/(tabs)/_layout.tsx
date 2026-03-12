@@ -73,10 +73,7 @@ export default function AdminTabLayout() {
       />
       <Tabs.Screen
         name="services"
-        options={{
-          title: "Services",
-          tabBarIcon: ({ color, size }) => <Ionicons name="construct-outline" size={size} color={color} />,
-        }}
+        options={{ href: null }}
       />
     </Tabs>
   );

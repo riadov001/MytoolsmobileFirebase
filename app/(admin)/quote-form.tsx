@@ -21,6 +21,18 @@ const STATUS_OPTIONS = [
   { value: "converted", label: "Converti", color: "#3B82F6" },
 ];
 
+interface LineItem {
+  key: string;
+  description: string;
+  quantity: string;
+  unitPriceExcludingTax: string;
+  taxRate: string;
+}
+
+function genKey() {
+  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
 export default function QuoteFormScreen() {
   const params = useLocalSearchParams();
   const rawId = params.id;
@@ -35,19 +47,19 @@ export default function QuoteFormScreen() {
   const [clientId, setClientId] = useState("");
   const [clientSearch, setClientSearch] = useState("");
   const [showClientList, setShowClientList] = useState(false);
-  const [serviceId, setServiceId] = useState("");
-  const [serviceSearch, setServiceSearch] = useState("");
-  const [showServiceList, setShowServiceList] = useState(false);
   const [status, setStatus] = useState("pending");
-  const [priceExcludingTax, setPriceExcludingTax] = useState("");
-  const [taxRate, setTaxRate] = useState("20");
-  const [quoteAmount, setQuoteAmount] = useState("0.00");
   const [notes, setNotes] = useState("");
   const [vehicleRegistration, setVehicleRegistration] = useState("");
   const [vehicleMake, setVehicleMake] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
   const [mediaUris, setMediaUris] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+
+  const [items, setItems] = useState<LineItem[]>([
+    { key: genKey(), description: "", quantity: "1", unitPriceExcludingTax: "", taxRate: "20" },
+  ]);
+  const [servicePickerItemKey, setServicePickerItemKey] = useState<string | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
 
   const { data: clients = [] } = useQuery({ queryKey: ["admin-clients"], queryFn: adminClients.getAll });
   const { data: services = [] } = useQuery({ queryKey: ["admin-services"], queryFn: adminServices.getAll });
@@ -61,10 +73,7 @@ export default function QuoteFormScreen() {
   useEffect(() => {
     if (existing && isEdit) {
       setClientId(String(existing.clientId || existing.client?.id || ""));
-      setServiceId(String(existing.serviceId || ""));
       setStatus(existing.status || "pending");
-      setPriceExcludingTax(String(existing.priceExcludingTax || ""));
-      setTaxRate(String(existing.taxRate || "20"));
       setNotes(existing.notes || "");
       setVehicleRegistration(existing.vehicleRegistration || "");
       setVehicleMake(existing.vehicleMake || "");
@@ -73,14 +82,80 @@ export default function QuoteFormScreen() {
       if (Array.isArray(existingMedia) && existingMedia.length > 0) {
         setMediaUris(existingMedia);
       }
+      if (existing.items?.length) {
+        setItems(
+          existing.items.map((it: any) => ({
+            key: genKey(),
+            description: it.description || "",
+            quantity: String(it.quantity || 1),
+            unitPriceExcludingTax: String(it.unitPriceExcludingTax || it.unitPrice || ""),
+            taxRate: String(it.taxRate || 20),
+          }))
+        );
+      } else if (existing.priceExcludingTax || existing.serviceId) {
+        setItems([{
+          key: genKey(),
+          description: existing.serviceType || existing.serviceName || "",
+          quantity: "1",
+          unitPriceExcludingTax: String(existing.priceExcludingTax || ""),
+          taxRate: String(existing.taxRate || 20),
+        }]);
+      }
     }
   }, [existing]);
 
-  useEffect(() => {
-    const ht = parseFloat(priceExcludingTax) || 0;
-    const rate = parseFloat(taxRate) || 0;
-    setQuoteAmount((ht * (1 + rate / 100)).toFixed(2));
-  }, [priceExcludingTax, taxRate]);
+  const calcItem = (it: LineItem) => {
+    const qty = parseFloat(it.quantity) || 0;
+    const price = parseFloat(it.unitPriceExcludingTax) || 0;
+    const rate = parseFloat(it.taxRate) || 0;
+    const totalHT = qty * price;
+    const tax = totalHT * (rate / 100);
+    return { totalHT, tax, totalTTC: totalHT + tax };
+  };
+
+  const totals = items.reduce(
+    (acc, it) => {
+      const c = calcItem(it);
+      return { ht: acc.ht + c.totalHT, tax: acc.tax + c.tax, ttc: acc.ttc + c.totalTTC };
+    },
+    { ht: 0, tax: 0, ttc: 0 }
+  );
+
+  const updateItem = (key: string, field: keyof LineItem, value: string) => {
+    setItems(prev => prev.map(it => (it.key === key ? { ...it, [field]: value } : it)));
+  };
+
+  const addItem = () =>
+    setItems(prev => [
+      ...prev,
+      { key: genKey(), description: "", quantity: "1", unitPriceExcludingTax: "", taxRate: "20" },
+    ]);
+
+  const removeItem = (key: string) => setItems(prev => prev.filter(it => it.key !== key));
+
+  const openServicePicker = (itemKey: string) => {
+    setServicePickerItemKey(itemKey);
+    setServiceSearch("");
+  };
+
+  const closeServicePicker = () => {
+    setServicePickerItemKey(null);
+    setServiceSearch("");
+  };
+
+  const selectServiceForItem = (svc: any) => {
+    if (!servicePickerItemKey) return;
+    setItems(prev => prev.map(it => {
+      if (it.key !== servicePickerItemKey) return it;
+      return {
+        ...it,
+        description: svc.name || it.description,
+        unitPriceExcludingTax: svc.basePrice != null ? String(parseFloat(svc.basePrice)) : it.unitPriceExcludingTax,
+      };
+    }));
+    Haptics.selectionAsync();
+    closeServicePicker();
+  };
 
   const pickImage = async (fromCamera: boolean) => {
     if (mediaUris.length >= 5) {
@@ -118,27 +193,32 @@ export default function QuoteFormScreen() {
       showAlert({ type: "error", title: "Erreur", message: "Veuillez sélectionner un client.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
-    if (!serviceId) {
-      showAlert({ type: "error", title: "Erreur", message: "Veuillez sélectionner un service.", buttons: [{ text: "OK", style: "primary" }] });
-      return;
-    }
     setSaving(true);
     try {
-      const ht = parseFloat(priceExcludingTax) || 0;
-      const rate = parseFloat(taxRate) || 0;
-      const taxAmount = ht * (rate / 100);
+      const builtItems = items.map(it => {
+        const c = calcItem(it);
+        return {
+          description: it.description,
+          quantity: parseFloat(it.quantity) || 0,
+          unitPriceExcludingTax: parseFloat(it.unitPriceExcludingTax) || 0,
+          totalExcludingTax: c.totalHT,
+          taxRate: parseFloat(it.taxRate) || 0,
+          taxAmount: c.tax,
+          totalIncludingTax: c.totalTTC,
+        };
+      });
       const body: any = {
         clientId,
-        serviceId,
         status,
-        quoteAmount: ht + taxAmount,
-        priceExcludingTax: ht,
-        taxRate: rate,
-        taxAmount,
+        quoteAmount: totals.ttc,
+        priceExcludingTax: totals.ht,
+        taxRate: items.length > 0 ? parseFloat(items[0].taxRate) || 20 : 20,
+        taxAmount: totals.tax,
         notes,
         vehicleRegistration,
         vehicleMake,
         vehicleModel,
+        items: builtItems,
         requestDetails: mediaUris.length > 0 ? { mediaUrls: mediaUris } : undefined,
       };
       if (isEdit) {
@@ -163,7 +243,6 @@ export default function QuoteFormScreen() {
   const clientsArr = Array.isArray(clients) ? clients : [];
   const servicesArr = Array.isArray(services) ? services : [];
   const selectedClient = clientsArr.find((c: any) => String(c.id) === clientId);
-  const selectedService = servicesArr.find((s: any) => String(s.id) === serviceId);
   const filteredClients = clientSearch
     ? clientsArr.filter((c: any) => {
         const fullName = `${c.firstName || ""} ${c.lastName || ""}`.toLowerCase();
@@ -268,13 +347,13 @@ export default function QuoteFormScreen() {
         </View>
       </Modal>
 
-      <Modal visible={showServiceList} animationType="slide" onRequestClose={() => setShowServiceList(false)}>
+      <Modal visible={servicePickerItemKey !== null} animationType="slide" onRequestClose={closeServicePicker}>
         <View style={[styles.container, { paddingTop: topPad }]}>
           <View style={styles.modalHeader}>
-            <Pressable style={styles.backBtn} onPress={() => { setShowServiceList(false); setServiceSearch(""); }}>
+            <Pressable style={styles.backBtn} onPress={closeServicePicker}>
               <Ionicons name="close" size={24} color={theme.text} />
             </Pressable>
-            <Text style={styles.headerTitle}>Sélectionner un service</Text>
+            <Text style={styles.headerTitle}>Choisir un service</Text>
             <View style={{ width: 44 }} />
           </View>
           <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
@@ -299,31 +378,27 @@ export default function QuoteFormScreen() {
             data={filteredServices}
             keyExtractor={(s: any) => String(s.id)}
             renderItem={({ item }: { item: any }) => {
-              const selected = serviceId === String(item.id);
-              const price = item.basePrice ? parseFloat(item.basePrice).toFixed(2) + " €" : null;
-              const duration = item.estimatedDuration ? item.estimatedDuration + " min" : null;
+              const price = item.basePrice != null ? parseFloat(item.basePrice).toFixed(2) + " € HT" : null;
+              const dur = item.estimatedDuration != null
+                ? (String(item.estimatedDuration).includes("min") ? item.estimatedDuration : item.estimatedDuration + " min")
+                : null;
               return (
                 <Pressable
-                  style={[styles.listRow, selected && { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
-                  onPress={() => {
-                    setServiceId(String(item.id));
-                    if (item.basePrice && !priceExcludingTax) setPriceExcludingTax(String(item.basePrice));
-                    setShowServiceList(false);
-                    setServiceSearch("");
-                  }}
+                  style={styles.listRow}
+                  onPress={() => selectServiceForItem(item)}
                 >
-                  <View style={[styles.avatar, { backgroundColor: selected ? theme.primary : "#8B5CF620" }]}>
-                    <Ionicons name="construct" size={18} color={selected ? "#fff" : "#8B5CF6"} />
+                  <View style={[styles.avatar, { backgroundColor: theme.primary + "20" }]}>
+                    <Ionicons name="construct" size={18} color={theme.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.listRowName, selected && { color: theme.primary }]}>{item.name}</Text>
+                    <Text style={styles.listRowName}>{item.name}</Text>
                     {item.description ? <Text style={styles.listRowSub} numberOfLines={1}>{item.description}</Text> : null}
                     <View style={{ flexDirection: "row", gap: 10, marginTop: 2 }}>
                       {price ? <Text style={[styles.listRowSub, { color: theme.primary }]}>{price}</Text> : null}
-                      {duration ? <Text style={styles.listRowSub}>{duration}</Text> : null}
+                      {dur ? <Text style={styles.listRowSub}>{dur}</Text> : null}
                     </View>
                   </View>
-                  {selected && <Ionicons name="checkmark-circle" size={20} color={theme.primary} />}
+                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                 </Pressable>
               );
             }}
@@ -360,32 +435,6 @@ export default function QuoteFormScreen() {
           <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
         </Pressable>
 
-        <Text style={styles.label}>Service *</Text>
-        <Pressable
-          style={[styles.selectorBtn, selectedService && { borderColor: "#8B5CF6" }]}
-          onPress={() => setShowServiceList(true)}
-        >
-          {selectedService ? (
-            <View style={styles.selectorContent}>
-              <View style={[styles.avatar, { width: 32, height: 32, borderRadius: 16, backgroundColor: "#8B5CF620" }]}>
-                <Ionicons name="construct" size={16} color="#8B5CF6" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.selectorText, { color: "#8B5CF6" }]}>{selectedService.name}</Text>
-                {selectedService.basePrice ? (
-                  <Text style={{ fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary }}>
-                    {parseFloat(selectedService.basePrice).toFixed(2)} €
-                    {selectedService.estimatedDuration ? ` · ${selectedService.estimatedDuration} min` : ""}
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-          ) : (
-            <Text style={[styles.selectorText, { color: theme.textTertiary }]}>Sélectionner un service...</Text>
-          )}
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-        </Pressable>
-
         <Text style={styles.label}>Statut</Text>
         <View style={styles.chipRow}>
           {STATUS_OPTIONS.map(s => (
@@ -399,32 +448,74 @@ export default function QuoteFormScreen() {
           ))}
         </View>
 
-        <Text style={styles.label}>Montant HT (€)</Text>
-        <TextInput
-          style={styles.input}
-          value={priceExcludingTax}
-          onChangeText={setPriceExcludingTax}
-          keyboardType="decimal-pad"
-          placeholder="0.00"
-          placeholderTextColor={theme.textTertiary}
-        />
-
-        <Text style={styles.label}>Taux TVA (%)</Text>
-        <View style={styles.chipRow}>
-          {["0", "5.5", "10", "20"].map(rate => (
-            <Pressable
-              key={rate}
-              style={[styles.chip, taxRate === rate && { backgroundColor: theme.primary + "20", borderColor: theme.primary }]}
-              onPress={() => setTaxRate(rate)}
-            >
-              <Text style={[styles.chipText, taxRate === rate && { color: theme.primary }]}>{rate}%</Text>
-            </Pressable>
-          ))}
+        <View style={styles.itemsHeader}>
+          <Text style={styles.sectionTitle}>Lignes du devis</Text>
+          <Pressable style={styles.addItemBtn} onPress={addItem} accessibilityLabel="Ajouter une ligne">
+            <Ionicons name="add" size={18} color={theme.primary} />
+            <Text style={styles.addItemText}>Ajouter</Text>
+          </Pressable>
         </View>
 
-        <View style={[styles.totalCard, { marginTop: 8 }]}>
-          <Text style={{ fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textSecondary }}>Total TTC</Text>
-          <Text style={{ fontSize: 22, fontFamily: "Inter_700Bold", color: theme.primary }}>{quoteAmount} €</Text>
+        {items.map((item, idx) => (
+          <View key={item.key} style={styles.itemCard}>
+            <View style={styles.itemHeaderRow}>
+              <Text style={styles.itemNumber}>Ligne {idx + 1}</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Pressable
+                  style={styles.servicePickBtn}
+                  onPress={() => openServicePicker(item.key)}
+                  accessibilityLabel="Choisir un service"
+                >
+                  <Ionicons name="construct-outline" size={14} color={theme.primary} />
+                  <Text style={styles.servicePickText}>Services</Text>
+                </Pressable>
+                {items.length > 1 && (
+                  <Pressable onPress={() => removeItem(item.key)} accessibilityLabel="Supprimer la ligne">
+                    <Ionicons name="close-circle" size={22} color="#EF4444" />
+                  </Pressable>
+                )}
+              </View>
+            </View>
+            <TextInput
+              style={styles.input}
+              placeholder="Description"
+              placeholderTextColor={theme.textTertiary}
+              value={item.description}
+              onChangeText={v => updateItem(item.key, "description", v)}
+            />
+            <View style={styles.itemRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.miniLabel}>Qté</Text>
+                <TextInput style={styles.input} value={item.quantity} onChangeText={v => updateItem(item.key, "quantity", v)} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.miniLabel}>Prix HT</Text>
+                <TextInput style={styles.input} value={item.unitPriceExcludingTax} onChangeText={v => updateItem(item.key, "unitPriceExcludingTax", v)} keyboardType="decimal-pad" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.miniLabel}>TVA %</Text>
+                <TextInput style={styles.input} value={item.taxRate} onChangeText={v => updateItem(item.key, "taxRate", v)} keyboardType="decimal-pad" />
+              </View>
+            </View>
+            <Text style={styles.itemTotal}>
+              {"TTC: " + calcItem(item).totalTTC.toFixed(2) + " \u20AC"}
+            </Text>
+          </View>
+        ))}
+
+        <View style={styles.totalCard}>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total HT</Text>
+            <Text style={styles.totalVal}>{totals.ht.toFixed(2) + " \u20AC"}</Text>
+          </View>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TVA</Text>
+            <Text style={styles.totalVal}>{totals.tax.toFixed(2) + " \u20AC"}</Text>
+          </View>
+          <View style={[styles.totalRow, { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 8, marginTop: 4 }]}>
+            <Text style={styles.totalLabelBold}>Total TTC</Text>
+            <Text style={styles.totalValBold}>{totals.ttc.toFixed(2) + " \u20AC"}</Text>
+          </View>
         </View>
 
         <Text style={[styles.label, { marginTop: 16 }]}>Véhicule</Text>
@@ -511,6 +602,7 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
     fontSize: 12, fontFamily: "Inter_600SemiBold", color: theme.textTertiary,
     textTransform: "uppercase", letterSpacing: 0.5, marginTop: 8,
   },
+  miniLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: theme.textTertiary, marginBottom: 2 },
   input: {
     backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border,
     paddingHorizontal: 14, height: 48, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text,
@@ -528,11 +620,6 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
     backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border,
   },
   chipText: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.textSecondary },
-  totalCard: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    backgroundColor: theme.primary + "10", borderRadius: 12, borderWidth: 1, borderColor: theme.primary + "30",
-    paddingHorizontal: 16, paddingVertical: 12,
-  },
   searchBox: {
     flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: theme.surface,
     borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, height: 44,
@@ -546,6 +633,36 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   avatarText: { fontSize: 14, fontFamily: "Inter_700Bold" },
   listRowName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.text },
   listRowSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary, marginTop: 1 },
+  sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: theme.text },
+  itemsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
+  addItemBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: theme.primary + "15",
+  },
+  addItemText: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.primary },
+  itemCard: {
+    backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1,
+    borderColor: theme.border, padding: 14, gap: 8, marginTop: 8,
+  },
+  itemHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  itemNumber: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: theme.textTertiary },
+  servicePickBtn: {
+    flexDirection: "row", alignItems: "center", gap: 4,
+    paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8,
+    backgroundColor: theme.primary + "15", borderWidth: 1, borderColor: theme.primary + "30",
+  },
+  servicePickText: { fontSize: 11, fontFamily: "Inter_500Medium", color: theme.primary },
+  itemRow: { flexDirection: "row", gap: 8 },
+  itemTotal: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.primary, textAlign: "right" },
+  totalCard: {
+    backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1,
+    borderColor: theme.border, padding: 14, gap: 6, marginTop: 12,
+  },
+  totalRow: { flexDirection: "row", justifyContent: "space-between" },
+  totalLabel: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary },
+  totalVal: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text },
+  totalLabelBold: { fontSize: 16, fontFamily: "Inter_700Bold", color: theme.text },
+  totalValBold: { fontSize: 16, fontFamily: "Inter_700Bold", color: theme.primary },
   mediaHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
   mediaButtons: { flexDirection: "row", gap: 8 },
   mediaBtn: {

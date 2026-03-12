@@ -7,7 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminInvoices, adminClients } from "@/lib/admin-api";
+import { adminInvoices, adminClients, adminServices } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -42,14 +42,17 @@ export default function InvoiceFormScreen() {
   const [showClientList, setShowClientList] = useState(false);
   const [status, setStatus] = useState("pending");
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<LineItem[]>([
     { key: genKey(), description: "", quantity: "1", unitPriceExcludingTax: "", taxRate: "20" },
   ]);
   const [saving, setSaving] = useState(false);
 
+  const [servicePickerItemKey, setServicePickerItemKey] = useState<string | null>(null);
+  const [serviceSearch, setServiceSearch] = useState("");
+
   const { data: clients = [] } = useQuery({ queryKey: ["admin-clients"], queryFn: adminClients.getAll });
+  const { data: services = [] } = useQuery({ queryKey: ["admin-services"], queryFn: adminServices.getAll });
   const { data: existing, isLoading: loadingExisting } = useQuery({
     queryKey: ["admin-invoice", id],
     queryFn: () => adminInvoices.getById(id),
@@ -61,7 +64,6 @@ export default function InvoiceFormScreen() {
       setClientId(String(existing.clientId || existing.client?.id || ""));
       setStatus(existing.status || "pending");
       setPaymentMethod(existing.paymentMethod || "");
-      setDueDate(existing.dueDate ? String(existing.dueDate).split("T")[0] : "");
       setNotes(existing.notes || "");
       if (existing.items?.length) {
         setItems(
@@ -105,6 +107,30 @@ export default function InvoiceFormScreen() {
     ]);
 
   const removeItem = (key: string) => setItems(prev => prev.filter(it => it.key !== key));
+
+  const openServicePicker = (itemKey: string) => {
+    setServicePickerItemKey(itemKey);
+    setServiceSearch("");
+  };
+
+  const closeServicePicker = () => {
+    setServicePickerItemKey(null);
+    setServiceSearch("");
+  };
+
+  const selectServiceForItem = (svc: any) => {
+    if (!servicePickerItemKey) return;
+    setItems(prev => prev.map(it => {
+      if (it.key !== servicePickerItemKey) return it;
+      return {
+        ...it,
+        description: svc.name || it.description,
+        unitPriceExcludingTax: svc.basePrice != null ? String(parseFloat(svc.basePrice)) : it.unitPriceExcludingTax,
+      };
+    }));
+    Haptics.selectionAsync();
+    closeServicePicker();
+  };
 
   const handleSave = async () => {
     if (!clientId) {
@@ -153,6 +179,7 @@ export default function InvoiceFormScreen() {
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
   const clientsArr = Array.isArray(clients) ? clients : [];
+  const servicesArr = Array.isArray(services) ? services : [];
   const selectedClient = clientsArr.find((c: any) => String(c.id) === clientId);
   const filteredClients = clientSearch
     ? clientsArr.filter((c: any) => {
@@ -160,6 +187,9 @@ export default function InvoiceFormScreen() {
         return fullName.includes(clientSearch.toLowerCase()) || (c.email || "").toLowerCase().includes(clientSearch.toLowerCase());
       })
     : clientsArr;
+  const filteredServices = serviceSearch
+    ? servicesArr.filter((s: any) => (s.name || "").toLowerCase().includes(serviceSearch.toLowerCase()))
+    : servicesArr;
 
   if (isEdit && loadingExisting) {
     return (
@@ -213,19 +243,17 @@ export default function InvoiceFormScreen() {
               const selected = clientId === String(item.id);
               return (
                 <Pressable
-                  style={[styles.clientRow, selected && { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
+                  style={[styles.listRow, selected && { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}
                   onPress={() => { setClientId(String(item.id)); setShowClientList(false); setClientSearch(""); }}
                 >
-                  <View style={[styles.clientAvatar, { backgroundColor: selected ? theme.primary : theme.primary + "20" }]}>
-                    <Text style={[styles.clientAvatarText, { color: selected ? "#fff" : theme.primary }]}>
+                  <View style={[styles.avatar, { backgroundColor: selected ? theme.primary : theme.primary + "20" }]}>
+                    <Text style={[styles.avatarText, { color: selected ? "#fff" : theme.primary }]}>
                       {(item.firstName?.[0] || "").toUpperCase()}{(item.lastName?.[0] || "").toUpperCase() || "?"}
                     </Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.clientName, selected && { color: theme.primary }]}>
-                      {item.firstName} {item.lastName}
-                    </Text>
-                    <Text style={styles.clientEmail}>{item.email}</Text>
+                    <Text style={[styles.listRowName, selected && { color: theme.primary }]}>{item.firstName} {item.lastName}</Text>
+                    <Text style={styles.listRowSub}>{item.email}</Text>
                   </View>
                   {selected && <Ionicons name="checkmark-circle" size={20} color={theme.primary} />}
                 </Pressable>
@@ -243,10 +271,74 @@ export default function InvoiceFormScreen() {
         </View>
       </Modal>
 
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]}
-        showsVerticalScrollIndicator={false}
-      >
+      <Modal visible={servicePickerItemKey !== null} animationType="slide" onRequestClose={closeServicePicker}>
+        <View style={[styles.container, { paddingTop: topPad }]}>
+          <View style={styles.modalHeader}>
+            <Pressable style={styles.backBtn} onPress={closeServicePicker}>
+              <Ionicons name="close" size={24} color={theme.text} />
+            </Pressable>
+            <Text style={styles.headerTitle}>Choisir un service</Text>
+            <View style={{ width: 44 }} />
+          </View>
+          <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+            <View style={styles.searchBox}>
+              <Ionicons name="search" size={16} color={theme.textTertiary} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Nom du service..."
+                placeholderTextColor={theme.textTertiary}
+                value={serviceSearch}
+                onChangeText={setServiceSearch}
+                autoFocus
+              />
+              {serviceSearch.length > 0 && (
+                <Pressable onPress={() => setServiceSearch("")}>
+                  <Ionicons name="close-circle" size={16} color={theme.textTertiary} />
+                </Pressable>
+              )}
+            </View>
+          </View>
+          <FlatList
+            data={filteredServices}
+            keyExtractor={(s: any) => String(s.id)}
+            renderItem={({ item }: { item: any }) => {
+              const price = item.basePrice != null ? parseFloat(item.basePrice).toFixed(2) + " € HT" : null;
+              const dur = item.estimatedDuration != null
+                ? (String(item.estimatedDuration).includes("min") ? item.estimatedDuration : item.estimatedDuration + " min")
+                : null;
+              return (
+                <Pressable
+                  style={styles.listRow}
+                  onPress={() => selectServiceForItem(item)}
+                >
+                  <View style={[styles.avatar, { backgroundColor: theme.primary + "20" }]}>
+                    <Ionicons name="construct" size={18} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.listRowName}>{item.name}</Text>
+                    {item.description ? <Text style={styles.listRowSub} numberOfLines={1}>{item.description}</Text> : null}
+                    <View style={{ flexDirection: "row", gap: 10, marginTop: 2 }}>
+                      {price ? <Text style={[styles.listRowSub, { color: theme.primary }]}>{price}</Text> : null}
+                      {dur ? <Text style={styles.listRowSub}>{dur}</Text> : null}
+                    </View>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                </Pressable>
+              );
+            }}
+            contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad }}
+            scrollEnabled={filteredServices.length > 0}
+            ListEmptyComponent={
+              <View style={{ alignItems: "center", paddingTop: 40 }}>
+                <Ionicons name="construct-outline" size={40} color={theme.textTertiary} />
+                <Text style={{ color: theme.textTertiary, marginTop: 8 }}>Aucun service trouvé</Text>
+              </View>
+            }
+          />
+        </View>
+      </Modal>
+
+      <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: bottomPad }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.label}>Client *</Text>
         <Pressable
           style={[styles.selectorBtn, selectedClient && { borderColor: theme.primary }]}
@@ -254,8 +346,8 @@ export default function InvoiceFormScreen() {
         >
           {selectedClient ? (
             <View style={styles.selectorContent}>
-              <View style={[styles.clientAvatar, { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.primary + "20" }]}>
-                <Text style={[styles.clientAvatarText, { fontSize: 12, color: theme.primary }]}>
+              <View style={[styles.avatar, { width: 32, height: 32, borderRadius: 16, backgroundColor: theme.primary + "20" }]}>
+                <Text style={[styles.avatarText, { fontSize: 12, color: theme.primary }]}>
                   {(selectedClient.firstName?.[0] || "").toUpperCase()}{(selectedClient.lastName?.[0] || "").toUpperCase()}
                 </Text>
               </View>
@@ -309,11 +401,21 @@ export default function InvoiceFormScreen() {
           <View key={item.key} style={styles.itemCard}>
             <View style={styles.itemHeaderRow}>
               <Text style={styles.itemNumber}>Ligne {idx + 1}</Text>
-              {items.length > 1 && (
-                <Pressable onPress={() => removeItem(item.key)} accessibilityLabel="Supprimer la ligne">
-                  <Ionicons name="close-circle" size={22} color="#EF4444" />
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Pressable
+                  style={styles.servicePickBtn}
+                  onPress={() => openServicePicker(item.key)}
+                  accessibilityLabel="Choisir un service"
+                >
+                  <Ionicons name="construct-outline" size={14} color={theme.primary} />
+                  <Text style={styles.servicePickText}>Services</Text>
                 </Pressable>
-              )}
+                {items.length > 1 && (
+                  <Pressable onPress={() => removeItem(item.key)} accessibilityLabel="Supprimer la ligne">
+                    <Ionicons name="close-circle" size={22} color="#EF4444" />
+                  </Pressable>
+                )}
+              </View>
             </View>
             <TextInput
               style={styles.input}
@@ -367,11 +469,7 @@ export default function InvoiceFormScreen() {
           multiline
         />
 
-        <Pressable
-          style={[styles.saveBtn, saving && { opacity: 0.6 }]}
-          onPress={handleSave}
-          disabled={saving}
-        >
+        <Pressable style={[styles.saveBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
@@ -428,14 +526,14 @@ const getStyles = (theme: ThemeColors) =>
       borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, height: 44,
     },
     searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text },
-    clientRow: {
+    listRow: {
       flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: theme.surface,
       borderRadius: 12, borderWidth: 1, borderColor: theme.border, padding: 12, marginBottom: 8,
     },
-    clientAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
-    clientAvatarText: { fontSize: 14, fontFamily: "Inter_700Bold" },
-    clientName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.text },
-    clientEmail: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary, marginTop: 2 },
+    avatar: { width: 40, height: 40, borderRadius: 20, justifyContent: "center", alignItems: "center" },
+    avatarText: { fontSize: 14, fontFamily: "Inter_700Bold" },
+    listRowName: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.text },
+    listRowSub: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary, marginTop: 1 },
     sectionTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: theme.text },
     itemsHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 16 },
     addItemBtn: {
@@ -449,6 +547,12 @@ const getStyles = (theme: ThemeColors) =>
     },
     itemHeaderRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
     itemNumber: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: theme.textTertiary },
+    servicePickBtn: {
+      flexDirection: "row", alignItems: "center", gap: 4,
+      paddingVertical: 4, paddingHorizontal: 8, borderRadius: 8,
+      backgroundColor: theme.primary + "15", borderWidth: 1, borderColor: theme.primary + "30",
+    },
+    servicePickText: { fontSize: 11, fontFamily: "Inter_500Medium", color: theme.primary },
     itemRow: { flexDirection: "row", gap: 8 },
     itemTotal: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.primary, textAlign: "right" },
     totalCard: {
