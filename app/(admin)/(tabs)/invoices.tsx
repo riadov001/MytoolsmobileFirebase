@@ -18,11 +18,17 @@ function resolveClientName(item: any): string {
   const c = item.client;
   if (c?.firstName || c?.lastName) return `${c.firstName || ""} ${c.lastName || ""}`.trim();
   if (c?.name) return c.name;
+  if (c?.client_name) return c.client_name;
+  if (item.firstName || item.lastName) return `${item.firstName || ""} ${item.lastName || ""}`.trim();
   if (item.clientFirstName || item.clientLastName) return `${item.clientFirstName || ""} ${item.clientLastName || ""}`.trim();
   if (item.client_first_name || item.client_last_name) return `${item.client_first_name || ""} ${item.client_last_name || ""}`.trim();
-  if (item.clientName) return item.clientName;
+  if (item.clientName) {
+    const parts = String(item.clientName).trim().split(/\s+/);
+    if (parts.length >= 1) return item.clientName;
+  }
+  if (item.client_name) return item.client_name;
   if (c?.email) return c.email;
-  if (item.clientEmail) return item.clientEmail;
+  if (item.clientEmail || item.client_email) return item.clientEmail || item.client_email;
   if (item.clientId) return `Client #${item.clientId}`;
   return "Client";
 }

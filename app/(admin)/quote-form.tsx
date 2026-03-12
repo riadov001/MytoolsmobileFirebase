@@ -89,8 +89,8 @@ export default function QuoteFormScreen() {
             key: genKey(),
             description: it.description || "",
             quantity: String(it.quantity || 1),
-            unitPriceExcludingTax: String(it.unitPriceExcludingTax || it.unitPrice || it.unit_price || ""),
-            taxRate: String(it.taxRate || it.tvaRate || 20),
+            unitPriceExcludingTax: String(it.unitPriceExcludingTax || it.unitPrice || it.unit_price || it.price || it.totalPrice || ""),
+            taxRate: String(it.taxRate || it.tvaRate || it.tax_rate || 20),
           }))
         );
       } else if (existing.priceExcludingTax || existing.serviceId) {
@@ -150,7 +150,7 @@ export default function QuoteFormScreen() {
       if (it.key !== servicePickerItemKey) return it;
       return {
         ...it,
-        description: svc.description || svc.name || it.description,
+        description: svc.description ? `${svc.name} — ${svc.description}` : (svc.name || it.description),
         unitPriceExcludingTax: svc.basePrice != null ? String(parseFloat(svc.basePrice)) : it.unitPriceExcludingTax,
       };
     }));

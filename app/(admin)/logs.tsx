@@ -98,6 +98,15 @@ export default function LogsScreen() {
     } catch {}
   };
 
+  const handleClear = async () => {
+    try {
+      await adminLogs.clear();
+      setLogs([]);
+      lastTimestampRef.current = "";
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+  };
+
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 16 : insets.bottom + 16;
 
@@ -136,6 +145,9 @@ export default function LogsScreen() {
           </Pressable>
           <Pressable style={styles.iconBtn} onPress={handleShare} accessibilityLabel="Partager">
             <Ionicons name="share-outline" size={20} color={theme.primary} />
+          </Pressable>
+          <Pressable style={[styles.iconBtn, { backgroundColor: "#EF444410", borderColor: "#EF444430" }]} onPress={handleClear} accessibilityLabel="Vider les logs">
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
           </Pressable>
         </View>
       </View>

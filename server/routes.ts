@@ -255,6 +255,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json({ logs: entries, total: logBuffer.length });
   });
 
+  app.delete("/api/admin/logs", async (req: Request, res: Response) => {
+    const auth = req.headers["authorization"] || "";
+    if (!auth) {
+      return res.status(401).json({ message: "Non authentifié" });
+    }
+    try {
+      const meRes = await fetch(`${EXTERNAL_API.replace(/\/api$/, "")}/api/mobile/auth/me`, {
+        headers: { "authorization": auth, "accept": "application/json" },
+      });
+      if (!meRes.ok) return res.status(401).json({ message: "Token invalide" });
+      const user: any = await meRes.json();
+      const role = (user?.role || "").toLowerCase();
+      if (role !== "root_admin" && role !== "root") {
+        return res.status(403).json({ message: "Accès réservé aux root admins" });
+      }
+    } catch {
+      return res.status(500).json({ message: "Erreur de vérification" });
+    }
+    logBuffer.length = 0;
+    res.json({ message: "Logs vidés", total: 0 });
+  });
+
   app.get("/api/public/garages", async (req: Request, res: Response) => {
     try {
       const endpoints = [

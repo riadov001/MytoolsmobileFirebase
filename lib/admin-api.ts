@@ -331,6 +331,7 @@ export const adminLogs = {
     const qs = since ? `?since=${encodeURIComponent(since)}` : "";
     return adminApiCall<{ logs: any[]; total: number }>(`/api/admin/logs${qs}`);
   },
+  clear: () => adminApiCall<{ message: string }>("/api/admin/logs", { method: "DELETE" }),
 };
 
 export const adminNotifications = {
