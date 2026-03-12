@@ -75,9 +75,9 @@ export default function QuoteFormScreen() {
       setClientId(String(existing.clientId || existing.client?.id || ""));
       setStatus(existing.status || "pending");
       setNotes(existing.notes || "");
-      setVehicleRegistration(existing.vehicleRegistration || "");
-      setVehicleMake(existing.vehicleMake || "");
-      setVehicleModel(existing.vehicleModel || "");
+      setVehicleRegistration(existing.vehicleInfo?.plate || existing.vehicleRegistration || "");
+      setVehicleMake(existing.vehicleInfo?.brand || existing.vehicleMake || "");
+      setVehicleModel(existing.vehicleInfo?.model || existing.vehicleModel || "");
       const existingMedia = existing.requestDetails?.mediaUrls;
       if (Array.isArray(existingMedia) && existingMedia.length > 0) {
         setMediaUris(existingMedia);
@@ -220,9 +220,11 @@ export default function QuoteFormScreen() {
         taxRate: items.length > 0 ? parseFloat(items[0].taxRate) || 20 : 20,
         taxAmount: totals.tax,
         notes,
-        vehicleRegistration,
-        vehicleMake,
-        vehicleModel,
+        vehicleInfo: {
+          plate: vehicleRegistration,
+          brand: vehicleMake,
+          model: vehicleModel,
+        },
         items: builtItems,
         requestDetails: mediaUris.length > 0 ? { mediaUrls: mediaUris } : undefined,
       };

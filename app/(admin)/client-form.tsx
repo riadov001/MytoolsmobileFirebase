@@ -37,6 +37,8 @@ export default function ClientFormScreen() {
   const [postalCode, setPostalCode] = useState("");
   const [role, setRole] = useState("client");
   const [companyName, setCompanyName] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [saving, setSaving] = useState(false);
 
   const { data: existing, isLoading: loadingExisting, error: loadingError } = useQuery({
@@ -69,6 +71,18 @@ export default function ClientFormScreen() {
       showAlert({ type: "error", title: "Erreur", message: "Le prénom et le nom sont obligatoires.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
+    if (!isEdit && !password.trim()) {
+      showAlert({ type: "error", title: "Erreur", message: "Le mot de passe est obligatoire.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
+    if (!isEdit && password.length < 8) {
+      showAlert({ type: "error", title: "Erreur", message: "Le mot de passe doit contenir au moins 8 caractères.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
+    if (!isEdit && password !== passwordConfirm) {
+      showAlert({ type: "error", title: "Erreur", message: "Les mots de passe ne correspondent pas.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
     setSaving(true);
     try {
       const body: any = {
@@ -83,6 +97,9 @@ export default function ClientFormScreen() {
       };
       if (role === "client_professionnel" && companyName.trim()) {
         body.companyName = companyName.trim();
+      }
+      if (!isEdit && password.trim()) {
+        body.password = password.trim();
       }
       if (isEdit) await adminClients.update(id, body);
       else await adminClients.create(body);
@@ -161,6 +178,15 @@ export default function ClientFormScreen() {
 
         <Text style={styles.label}>Email</Text>
         <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="email@exemple.com" placeholderTextColor={theme.textTertiary} keyboardType="email-address" autoCapitalize="none" autoCorrect={false} />
+
+        {!isEdit && (
+          <>
+            <Text style={styles.label}>Mot de passe *</Text>
+            <TextInput style={styles.input} value={password} onChangeText={setPassword} placeholder="Min. 8 caractères" placeholderTextColor={theme.textTertiary} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+            <Text style={styles.label}>Confirmer le mot de passe *</Text>
+            <TextInput style={styles.input} value={passwordConfirm} onChangeText={setPasswordConfirm} placeholder="Confirmez le mot de passe" placeholderTextColor={theme.textTertiary} secureTextEntry autoCapitalize="none" autoCorrect={false} />
+          </>
+        )}
 
         <Text style={styles.label}>Téléphone</Text>
         <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="06 12 34 56 78" placeholderTextColor={theme.textTertiary} keyboardType="phone-pad" />

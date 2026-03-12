@@ -71,9 +71,10 @@ export default function ReservationFormScreen() {
   const [scheduledDate, setScheduledDate] = useState("");
   const [scheduledTime, setScheduledTime] = useState("");
   const [notes, setNotes] = useState("");
-  const [vehicleRegistration, setVehicleRegistration] = useState("");
-  const [vehicleMake, setVehicleMake] = useState("");
+  const [vehiclePlate, setVehiclePlate] = useState("");
+  const [vehicleBrand, setVehicleBrand] = useState("");
   const [vehicleModel, setVehicleModel] = useState("");
+  const [vehicleYear, setVehicleYear] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -114,9 +115,10 @@ export default function ReservationFormScreen() {
         setScheduledTime(`${h}:${m}`);
       }
       setNotes(existing.notes || "");
-      setVehicleRegistration(existing.vehicleRegistration || "");
-      setVehicleMake(existing.vehicleMake || "");
-      setVehicleModel(existing.vehicleModel || "");
+      setVehiclePlate(existing.vehicleInfo?.plate || existing.vehicleRegistration || "");
+      setVehicleBrand(existing.vehicleInfo?.brand || existing.vehicleMake || "");
+      setVehicleModel(existing.vehicleInfo?.model || existing.vehicleModel || "");
+      setVehicleYear(existing.vehicleInfo?.year || "");
       setServiceType(existing.serviceType || "");
       setServiceId(existing.serviceId || "");
     }
@@ -142,17 +144,29 @@ export default function ReservationFormScreen() {
     setSaving(true);
     try {
       let dateStr = scheduledDate;
-      if (scheduledTime) dateStr += `T${scheduledTime}:00`;
+      let timeSlot = "09:00-10:30";
+      if (scheduledTime) {
+        const [h, m] = scheduledTime.split(":");
+        const startTime = scheduledTime;
+        const endHour = String(parseInt(h) + 1).padStart(2, "0");
+        const endMin = "30";
+        timeSlot = `${startTime}-${endHour}:${endMin}`;
+        dateStr += `T${scheduledTime}:00`;
+      }
       const servicesArr = Array.isArray(services) ? services : [];
       const resolvedServiceId = serviceId || servicesArr[0]?.id || undefined;
       const body: any = {
         clientId,
         status,
         scheduledDate: dateStr,
+        timeSlot,
         notes,
-        vehicleRegistration,
-        vehicleMake,
-        vehicleModel,
+        vehicleInfo: {
+          brand: vehicleBrand,
+          model: vehicleModel,
+          plate: vehiclePlate,
+          year: vehicleYear ? parseInt(vehicleYear) : undefined,
+        },
         serviceType,
       };
       if (resolvedServiceId) body.serviceId = resolvedServiceId;
@@ -427,9 +441,10 @@ export default function ReservationFormScreen() {
         />
 
         <Text style={[styles.label, { marginTop: 16 }]}>Véhicule</Text>
-        <TextInput style={styles.input} value={vehicleRegistration} onChangeText={setVehicleRegistration} placeholder="Immatriculation (AA-123-BB)" placeholderTextColor={theme.textTertiary} autoCapitalize="characters" />
-        <TextInput style={[styles.input, { marginTop: 8 }]} value={vehicleMake} onChangeText={setVehicleMake} placeholder="Marque (BMW, Audi...)" placeholderTextColor={theme.textTertiary} autoCapitalize="words" />
+        <TextInput style={styles.input} value={vehiclePlate} onChangeText={setVehiclePlate} placeholder="Immatriculation (AA-123-BB)" placeholderTextColor={theme.textTertiary} autoCapitalize="characters" />
+        <TextInput style={[styles.input, { marginTop: 8 }]} value={vehicleBrand} onChangeText={setVehicleBrand} placeholder="Marque (BMW, Audi...)" placeholderTextColor={theme.textTertiary} autoCapitalize="words" />
         <TextInput style={[styles.input, { marginTop: 8 }]} value={vehicleModel} onChangeText={setVehicleModel} placeholder="Modèle (Série 3, A4...)" placeholderTextColor={theme.textTertiary} autoCapitalize="words" />
+        <TextInput style={[styles.input, { marginTop: 8 }]} value={vehicleYear} onChangeText={setVehicleYear} placeholder="Année (2021)" placeholderTextColor={theme.textTertiary} keyboardType="number-pad" />
 
         <Text style={styles.label}>Notes</Text>
         <TextInput style={[styles.input, { height: 100, textAlignVertical: "top", paddingTop: 12 }]} value={notes} onChangeText={setNotes} placeholder="Notes..." placeholderTextColor={theme.textTertiary} multiline />

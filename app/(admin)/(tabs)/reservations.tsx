@@ -118,7 +118,8 @@ export default function AdminReservationsScreen() {
       if (search) {
         const s = search.toLowerCase();
         const name = `${r.client?.firstName || ""} ${r.client?.lastName || ""}`.toLowerCase();
-        return name.includes(s) || (r.vehicleMake || "").toLowerCase().includes(s);
+        const vehicleBrand = r.vehicleInfo?.brand || r.vehicleMake || "";
+        return name.includes(s) || vehicleBrand.toLowerCase().includes(s);
       }
       return true;
     });
@@ -162,8 +163,8 @@ export default function AdminReservationsScreen() {
               {item.serviceType ? (
                 <Text style={styles.cardService}>{item.serviceType}</Text>
               ) : null}
-              {item.vehicleMake ? (
-                <Text style={styles.cardSub}>{item.vehicleMake} {item.vehicleModel || ""}</Text>
+              {(item.vehicleInfo?.brand || item.vehicleMake) ? (
+                <Text style={styles.cardSub}>{item.vehicleInfo?.brand || item.vehicleMake} {item.vehicleInfo?.model || item.vehicleModel || ""}</Text>
               ) : null}
             </View>
             <View style={[styles.badge, { backgroundColor: color + "20" }]}>

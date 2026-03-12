@@ -72,7 +72,8 @@ export default function AdminQuotesScreen() {
     if (search) {
       const s = search.toLowerCase();
       const name = `${q.client?.firstName || ""} ${q.client?.lastName || ""}`.toLowerCase();
-      return name.includes(s) || (q.vehicleMake || "").toLowerCase().includes(s);
+      const vehicleBrand = q.vehicleInfo?.brand || q.vehicleMake || "";
+      return name.includes(s) || vehicleBrand.toLowerCase().includes(s);
     }
     return true;
   });
@@ -91,7 +92,7 @@ export default function AdminQuotesScreen() {
           <View style={styles.cardLeft}>
             <Text style={styles.cardTitle}>{clientName}</Text>
             <Text style={styles.cardSub}>
-              {item.vehicleMake ? `${item.vehicleMake} ${item.vehicleModel || ""}` : "Véhicule non renseigné"}
+              {(item.vehicleInfo?.brand || item.vehicleMake) ? `${item.vehicleInfo?.brand || item.vehicleMake} ${item.vehicleInfo?.model || item.vehicleModel || ""}` : "Véhicule non renseigné"}
             </Text>
           </View>
           <View style={[styles.badge, { backgroundColor: color + "20" }]}>
