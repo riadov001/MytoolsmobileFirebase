@@ -42,8 +42,16 @@ export function setOnTokenExpired(cb: () => void) {
   onTokenExpired = cb;
 }
 
+class TimeoutError extends Error {
+  constructor() {
+    super("Le serveur met trop de temps à répondre. Vérifiez votre connexion et réessayez.");
+    this.name = "TimeoutError";
+  }
+}
+
 function isNetworkError(err: any): boolean {
-  if (err?.name === "AbortError") return true;
+  if (err?.name === "AbortError" || err?.name === "TimeoutError") return true;
+  if (err instanceof TimeoutError) return true;
   if (err?.name === "TypeError" && err?.message?.includes("Network")) return true;
   if (err?.message?.includes("fetch") || err?.message?.includes("network")) return true;
   return false;
@@ -57,7 +65,7 @@ async function fetchWithTimeout(url: string, options: any, timeoutMs = REQUEST_T
     return res;
   } catch (err: any) {
     if (err?.name === "AbortError") {
-      throw new Error("Le serveur met trop de temps à répondre. Vérifiez votre connexion et réessayez.");
+      throw new TimeoutError();
     }
     throw err;
   } finally {
