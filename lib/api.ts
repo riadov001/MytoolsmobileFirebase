@@ -2,7 +2,7 @@ import { fetch as expoFetch } from "expo/fetch";
 import { Platform } from "react-native";
 
 const REQUEST_TIMEOUT_MS = 15000;
-const RETRY_DELAY_MS = 500;
+const RETRY_DELAY_MS = 1000;
 
 const getApiBase = () => {
   if (process.env.EXPO_PUBLIC_API_URL) {
