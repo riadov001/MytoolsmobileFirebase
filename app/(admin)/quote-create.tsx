@@ -119,8 +119,35 @@ export default function QuoteCreateScreen() {
     setLineItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
   };
 
-  const { totalHT, totalTVA, totalTTC } = calcTotals(lineItems);
   const servicesArr = Array.isArray(services) ? services : [];
+
+  const toggleService = (serviceId: string) => {
+    setSelectedServices(prev => {
+      const newSelection = prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId];
+      
+      // Auto-fill line items when services are selected
+      if (newSelection.length > 0) {
+        const selectedServiceObjs = servicesArr.filter((s: any) => newSelection.includes(s.id));
+        const newItems = selectedServiceObjs.map((s: any) => ({
+          description: s.name || s.label || "",
+          quantity: "1",
+          unitPrice: String(s.price || s.unitPrice || 0),
+          tvaRate: String(s.taxRate || s.tvaRate || "20"),
+        }));
+        // Replace first empty line item or append
+        setLineItems(prev => {
+          const hasEmptyDesc = prev.some(it => !it.description.trim());
+          if (hasEmptyDesc) {
+            return prev.map((it, idx) => (!it.description.trim() && idx === 0) ? newItems[0] : it);
+          }
+          return newItems.length > 0 ? newItems : prev;
+        });
+      }
+      return newSelection;
+    });
+  };
+
+  const { totalHT, totalTVA, totalTTC } = calcTotals(lineItems);
 
   const pickPhoto = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -147,6 +174,18 @@ export default function QuoteCreateScreen() {
       Alert.alert("Attention", "Veuillez sélectionner un client.");
       return;
     }
+    if (photos.length === 0) {
+      Alert.alert("Attention", "Ajoutez au moins une photo (minimum 1).");
+      return;
+    }
+    if (photos.length > 3) {
+      Alert.alert("Attention", "Maximum 3 photos autorisées.");
+      return;
+    }
+    if (selectedServices.length === 0) {
+      Alert.alert("Attention", "Sélectionnez au moins un service.");
+      return;
+    }
     const validItems = lineItems.filter(it => it.description.trim() && it.unitPrice);
     if (validItems.length === 0) {
       Alert.alert("Attention", "Ajoutez au moins une prestation avec une description et un prix.");
@@ -155,6 +194,7 @@ export default function QuoteCreateScreen() {
 
     const payload: any = {
       clientId: selectedClientId,
+      serviceId: selectedServices[0],
       status: "pending",
       notes: notes.trim() || undefined,
       description: notes.trim() || undefined,
@@ -326,7 +366,7 @@ export default function QuoteCreateScreen() {
                 renderItem={({ item: service }: { item: any }) => (
                   <Pressable
                     style={[styles.serviceOption, selectedServices.includes(service.id) && { backgroundColor: theme.primary + "20" }]}
-                    onPress={() => setSelectedServices(prev => prev.includes(service.id) ? prev.filter(id => id !== service.id) : [...prev, service.id])}
+                    onPress={() => toggleService(service.id)}
                   >
                     <Ionicons name={selectedServices.includes(service.id) ? "checkmark-circle" : "ellipse-outline"} size={18} color={selectedServices.includes(service.id) ? theme.primary : theme.textTertiary} />
                     <View style={{ flex: 1 }}>
