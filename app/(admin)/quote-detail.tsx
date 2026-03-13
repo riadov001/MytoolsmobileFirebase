@@ -8,7 +8,7 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminQuotes, adminClients } from "@/lib/admin-api";
+import { adminQuotes, adminClients, adminInvoices, adminReservations } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -88,6 +88,73 @@ export default function QuoteDetailScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
   });
+
+  const invoiceMutation = useMutation({
+    mutationFn: () => {
+      const payload = {
+        clientId: q?.clientId,
+        quoteId: id,
+        items: q?.items || q?.lineItems || q?.lines || [],
+        totalHT: q?.priceExcludingTax || q?.totalHT || q?.subtotal || 0,
+        taxAmount: q?.taxAmount || q?.tvaAmount || 0,
+        totalTTC: q?.quoteAmount || q?.totalTTC || q?.total || q?.amount || 0,
+        reference: q?.quoteNumber || q?.reference,
+        status: "pending",
+      };
+      return adminInvoices.create(payload);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
+      statusMutation.mutate({ status: "converted" });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert({
+        type: "success",
+        title: "Facture créée",
+        message: "La facture a été générée depuis ce devis.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    },
+    onError: () => {
+      showAlert({
+        type: "error",
+        title: "Erreur",
+        message: "Impossible de créer la facture.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    },
+  });
+
+  const handleCreateInvoice = () => {
+    showAlert({
+      type: "warning",
+      title: "Créer une facture",
+      message: "Créer une facture depuis ce devis ? Le montant sera prérempli.",
+      buttons: [
+        { text: "Annuler" },
+        { text: "Créer la facture", style: "primary", onPress: () => invoiceMutation.mutate() },
+      ],
+    });
+  };
+
+  const handleCreateReservation = () => {
+    showAlert({
+      type: "warning",
+      title: "Créer un rendez-vous",
+      message: "Créer un rendez-vous depuis ce devis ?",
+      buttons: [
+        { text: "Annuler" },
+        {
+          text: "Continuer",
+          style: "primary",
+          onPress: () => router.push({
+            pathname: "/(admin)/reservation-create",
+            params: { clientId: q?.clientId, quoteId: id, quoteName: q?.quoteNumber || q?.reference || "" },
+          } as any),
+        },
+      ],
+    });
+  };
 
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
@@ -317,6 +384,28 @@ export default function QuoteDetailScreen() {
           </View>
         ) : null}
 
+        {/* Conversion actions for approved/accepted quotes */}
+        {(statusKey === "approved" || statusKey === "accepted") && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Convertir ce devis</Text>
+            <Pressable
+              style={[styles.convertBtn, { backgroundColor: "#22C55E" }]}
+              onPress={handleCreateInvoice}
+              disabled={invoiceMutation.isPending}
+            >
+              <Ionicons name="receipt-outline" size={18} color="#fff" />
+              <Text style={styles.convertBtnText}>Créer une facture</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.convertBtn, { backgroundColor: "#3B82F6" }]}
+              onPress={handleCreateReservation}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#fff" />
+              <Text style={styles.convertBtnText}>Créer un rendez-vous</Text>
+            </Pressable>
+          </View>
+        )}
+
         {/* PDF */}
         {pdfUrl ? (
           <Pressable style={styles.pdfBtn} onPress={handlePdf}>
@@ -373,4 +462,6 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
     paddingVertical: 14, paddingHorizontal: 20,
   },
   pdfBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  convertBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16 },
+  convertBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });

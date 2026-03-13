@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback } from "react";
 import {
-  View, Text, StyleSheet, FlatList, Pressable, Platform, RefreshControl, TextInput, ActivityIndicator,
+  View, Text, StyleSheet, FlatList, ScrollView, Pressable, Platform, RefreshControl, TextInput, ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,6 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
+import { FilterChip } from "@/components/FilterChip";
 
 function resolveClient(item: any, clientMap: Record<string, any>): { name: string; email: string; phone: string } {
   const c = item.client || (item.clientId && clientMap[String(item.clientId)]) || null;
@@ -183,13 +184,17 @@ export default function AdminInvoicesScreen() {
         </View>
       </View>
 
-      <View style={styles.filterRow}>
+      <View style={styles.filterSeparator} />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
         {STATUSES.map(s => (
-          <Pressable key={s} style={[styles.filterChip, filter === s && { backgroundColor: theme.primary }]} onPress={() => setFilter(s)}>
-            <Text style={[styles.filterText, filter === s && { color: "#fff" }]}>{STATUS_LABELS[s]}</Text>
-          </Pressable>
+          <FilterChip
+            key={s}
+            label={STATUS_LABELS[s]}
+            active={filter === s}
+            onPress={() => setFilter(s)}
+          />
         ))}
-      </View>
+      </ScrollView>
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.primary} /></View>
@@ -223,9 +228,8 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   searchRow: { paddingHorizontal: 16, marginBottom: 10 },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, height: 44 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text },
-  filterRow: { flexDirection: "row", paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  filterText: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+  filterSeparator: { height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 10, opacity: 0.5 },
+  filterRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 12, flexDirection: "row" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   card: { backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: theme.border, padding: 14, marginBottom: 10, gap: 10 },
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },

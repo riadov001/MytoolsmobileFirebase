@@ -14,6 +14,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
 import { syncReservationsToCalendar } from "@/lib/calendar";
+import { FilterChip } from "@/components/FilterChip";
 
 function resolveClient(item: any, clientMap: Record<string, any>): { name: string; email: string; phone: string } {
   const c = item.client || (item.clientId && clientMap[String(item.clientId)]) || null;
@@ -114,7 +115,7 @@ export default function AdminReservationsScreen() {
 
   const handleCalendarSync = async () => {
     try {
-      const result = await syncReservationsToCalendar(arr);
+      const result = await syncReservationsToCalendar(filteredList);
       if (result.success) {
         showAlert({
           type: "success",
@@ -395,11 +396,15 @@ export default function AdminReservationsScreen() {
               />
             </View>
           </View>
+          <View style={styles.filterSeparator} />
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
             {(["all", "pending", "confirmed", "completed", "cancelled"] as const).map(s => (
-              <Pressable key={s} style={[styles.filterChip, filter === s && { backgroundColor: theme.primary }]} onPress={() => setFilter(s)}>
-                <Text style={[styles.filterText, filter === s && { color: "#fff" }]}>{STATUS_LABELS[s]}</Text>
-              </Pressable>
+              <FilterChip
+                key={s}
+                label={STATUS_LABELS[s]}
+                active={filter === s}
+                onPress={() => setFilter(s)}
+              />
             ))}
           </ScrollView>
           <FlatList
@@ -447,9 +452,8 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   searchRow: { paddingHorizontal: 16, marginBottom: 8 },
   searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, height: 44 },
   searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text },
-  filterRow: { paddingHorizontal: 16, gap: 8, marginBottom: 12 },
-  filterChip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, backgroundColor: theme.surface, borderWidth: 1, borderColor: theme.border },
-  filterText: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+  filterSeparator: { height: 1, backgroundColor: theme.border, marginHorizontal: 16, marginBottom: 10, opacity: 0.5 },
+  filterRow: { paddingHorizontal: 16, gap: 8, marginBottom: 12, flexDirection: "row" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
   card: { flexDirection: "row", backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: theme.border, marginBottom: 10, overflow: "hidden" },
   cardAccent: { width: 4 },
