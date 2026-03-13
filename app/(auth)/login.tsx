@@ -212,7 +212,7 @@ export default function LoginScreen() {
           <View style={styles.accessInfoBox}>
             <Ionicons name="lock-closed-outline" size={14} color="#666" />
             <Text style={styles.accessInfoText}>
-              Accès réservé aux administrateurs de garage. Pour obtenir vos identifiants, contactez le service client.
+              Cette application est destinée aux garages professionnels utilisant déjà la plateforme MyTools. Les comptes sont créés uniquement via la plateforme web sur mytoolsgroup.eu.
             </Text>
           </View>
 

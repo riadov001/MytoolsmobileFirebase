@@ -6,6 +6,7 @@ import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
@@ -18,11 +19,22 @@ export default function ConsentScreen() {
   const [acceptedPrivacy, setAcceptedPrivacy] = useState(false);
   const [acceptedCookies, setAcceptedCookies] = useState(false);
   const [acceptedData, setAcceptedData] = useState(false);
+  const [acceptedNotifications, setAcceptedNotifications] = useState(false);
 
   const allAccepted = acceptedPrivacy && acceptedCookies && acceptedData;
 
   const handleAccept = async () => {
     await AsyncStorage.setItem("consent_given", "true");
+    await AsyncStorage.setItem("consent_notifications", acceptedNotifications ? "true" : "false");
+
+    if (acceptedNotifications && Platform.OS === "ios") {
+      try {
+        await Notifications.requestPermissionsAsync({
+          ios: { allowAlert: true, allowBadge: true, allowSound: true },
+        });
+      } catch {}
+    }
+
     router.replace("/");
   };
 
@@ -101,6 +113,13 @@ export default function ConsentScreen() {
               onToggle={() => setAcceptedData(v => !v)}
               label="Traitement des données"
               sub="J'accepte que mes données soient traitées pour la gestion de mes devis, factures et rendez-vous"
+            />
+            <View style={styles.divider} />
+            <CheckRow
+              checked={acceptedNotifications}
+              onToggle={() => setAcceptedNotifications(v => !v)}
+              label="Notifications (optionnel)"
+              sub="J'accepte de recevoir des notifications push pour les mises à jour de devis, factures et rendez-vous"
             />
           </View>
         </View>
