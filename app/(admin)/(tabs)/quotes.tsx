@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
-import { FilterChip } from "@/components/FilterChip";
+import { StatusDropdown } from "@/components/StatusDropdown";
 import { FloatingSupport } from "@/components/FloatingSupport";
 
 function buildClientMap(clients: any[]): Record<string, any> {
@@ -262,17 +262,16 @@ export default function AdminQuotesScreen() {
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {STATUSES.map(s => (
-          <FilterChip
-            key={s}
-            label={STATUS_LABELS[s]}
-            active={filter === s}
-            onPress={() => setFilter(s)}
-            color={s !== "all" ? STATUS_COLORS[s] : undefined}
-          />
-        ))}
-      </ScrollView>
+      <StatusDropdown
+        label="Filtre"
+        selected={filter}
+        onSelect={setFilter}
+        options={STATUSES.map(s => ({
+          key: s,
+          label: STATUS_LABELS[s],
+          color: STATUS_COLORS[s]
+        }))}
+      />
 
       {quotesLoading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.primary} /></View>

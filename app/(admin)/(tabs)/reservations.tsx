@@ -14,7 +14,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
 import { syncReservationsToCalendar } from "@/lib/calendar";
-import { FilterChip } from "@/components/FilterChip";
+import { StatusDropdown } from "@/components/StatusDropdown";
 import { FloatingSupport } from "@/components/FloatingSupport";
 
 function resolveClient(item: any, clientMap: Record<string, any>): { name: string; email: string; phone: string } {
@@ -402,17 +402,18 @@ export default function AdminReservationsScreen() {
                   })}
                 </View>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.filterRow, { marginTop: 12 }]}>
-                {(["all", "pending", "confirmed", "completed", "cancelled"] as const).map(s => (
-                  <FilterChip
-                    key={s}
-                    label={STATUS_LABELS[s]}
-                    active={filter === s}
-                    onPress={() => setFilter(s)}
-                    color={s !== "all" ? STATUS_COLORS[s] : undefined}
-                  />
-                ))}
-              </ScrollView>
+              <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 12 }}>
+                <StatusDropdown
+                  label="Filtre"
+                  selected={filter}
+                  onSelect={setFilter}
+                  options={["all", "pending", "confirmed", "completed", "cancelled"].map(s => ({
+                    key: s,
+                    label: STATUS_LABELS[s],
+                    color: STATUS_COLORS[s]
+                  }))}
+                />
+              </View>
             </View>
           }
           ListHeaderComponentStyle={{ marginBottom: 12 }}
@@ -442,17 +443,16 @@ export default function AdminReservationsScreen() {
               />
             </View>
           </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-            {(["all", "pending", "confirmed", "completed", "cancelled"] as const).map(s => (
-              <FilterChip
-                key={s}
-                label={STATUS_LABELS[s]}
-                active={filter === s}
-                onPress={() => setFilter(s)}
-                color={s !== "all" ? STATUS_COLORS[s] : undefined}
-              />
-            ))}
-          </ScrollView>
+          <StatusDropdown
+            label="Filtre"
+            selected={filter}
+            onSelect={setFilter}
+            options={["all", "pending", "confirmed", "completed", "cancelled"].map(s => ({
+              key: s,
+              label: STATUS_LABELS[s],
+              color: STATUS_COLORS[s]
+            }))}
+          />
           <FlatList
             data={filteredList}
             keyExtractor={(item: any) => String(item.id)}

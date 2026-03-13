@@ -13,7 +13,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
-import { FilterChip } from "@/components/FilterChip";
+import { StatusDropdown } from "@/components/StatusDropdown";
 import { FloatingSupport } from "@/components/FloatingSupport";
 
 function resolveClient(item: any, clientMap: Record<string, any>): { name: string; email: string; phone: string } {
@@ -196,17 +196,16 @@ export default function AdminInvoicesScreen() {
         </View>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-        {STATUSES.map(s => (
-          <FilterChip
-            key={s}
-            label={STATUS_LABELS[s]}
-            active={filter === s}
-            onPress={() => setFilter(s)}
-            color={s !== "all" ? STATUS_COLORS[s] : undefined}
-          />
-        ))}
-      </ScrollView>
+      <StatusDropdown
+        label="Filtre"
+        selected={filter}
+        onSelect={setFilter}
+        options={STATUSES.map(s => ({
+          key: s,
+          label: STATUS_LABELS[s],
+          color: STATUS_COLORS[s]
+        }))}
+      />
 
       {isLoading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={theme.primary} /></View>
