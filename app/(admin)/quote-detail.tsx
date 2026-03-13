@@ -1,0 +1,308 @@
+import React, { useMemo } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator, Linking,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { Image } from "expo-image";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
+import { adminQuotes } from "@/lib/admin-api";
+import { useTheme } from "@/lib/theme";
+import { ThemeColors } from "@/constants/theme";
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "En attente", approved: "Approuvé", rejected: "Rejeté",
+  converted: "Converti", accepted: "Accepté", sent: "Envoyé",
+};
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#F59E0B", approved: "#22C55E", rejected: "#EF4444",
+  converted: "#3B82F6", accepted: "#22C55E", sent: "#8B5CF6",
+};
+
+function clientName(q: any): string {
+  const c = q?.client;
+  if (c?.firstName || c?.lastName) return `${c.firstName || ""} ${c.lastName || ""}`.trim();
+  if (c?.name) return c.name;
+  if (q?.clientFirstName || q?.clientLastName) return `${q.clientFirstName || ""} ${q.clientLastName || ""}`.trim();
+  if (q?.clientName) return q.clientName;
+  return "";
+}
+function clientEmail(q: any): string {
+  return q?.client?.email || q?.clientEmail || "";
+}
+function clientPhone(q: any): string {
+  return q?.client?.phone || q?.clientPhone || q?.client?.phoneNumber || "";
+}
+
+function fmtDate(val: string | null | undefined): string {
+  if (!val) return "—";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+}
+function fmtEur(val: any): string {
+  const n = parseFloat(val);
+  if (isNaN(n)) return "—";
+  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+export default function QuoteDetailScreen() {
+  const params = useLocalSearchParams();
+  const rawId = params.id;
+  const id = Array.isArray(rawId) ? rawId[0] : (typeof rawId === "string" ? rawId : "");
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => getStyles(theme), [theme]);
+
+  const { data: q, isLoading, error } = useQuery({
+    queryKey: ["admin-quote", id],
+    queryFn: () => adminQuotes.getById(id),
+    enabled: !!id,
+    retry: 1,
+  });
+
+  const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
+  const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
+
+  const handlePdf = async () => {
+    const url = q?.pdfUrl || q?.pdf_url || q?.documentUrl;
+    if (!url) return;
+    Haptics.selectionAsync();
+    try {
+      await Linking.openURL(url);
+    } catch {}
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (error || !q) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", gap: 16 }]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+        <Text style={{ fontSize: 15, color: theme.text, textAlign: "center", paddingHorizontal: 32 }}>
+          Impossible de charger ce devis.
+        </Text>
+        <Pressable style={[styles.backChip]} onPress={() => router.back()}>
+          <Text style={{ color: theme.primary, fontFamily: "Inter_600SemiBold" }}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const statusKey = (q.status || "").toLowerCase();
+  const statusColor = STATUS_COLORS[statusKey] || theme.textTertiary;
+  const statusLabel = STATUS_LABELS[statusKey] || q.status;
+
+  const items: any[] = q.items || q.lineItems || q.lines || q.quote_items || [];
+  const totalHT = q.priceExcludingTax || q.totalHT || q.totalExcludingTax || q.subtotal || "";
+  const totalTVA = q.taxAmount || q.tvaAmount || q.taxTotal || "";
+  const totalTTC = q.quoteAmount || q.totalTTC || q.total || q.totalIncludingTax || q.amount || "";
+  const photos: string[] = q.requestDetails?.mediaUrls || q.photos || q.mediaUrls || [];
+  const pdfUrl = q.pdfUrl || q.pdf_url || q.documentUrl;
+
+  const name = clientName(q);
+  const email = clientEmail(q);
+  const phone = clientPhone(q);
+
+  return (
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: topPad }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {q.quoteNumber || q.reference || "Devis"}
+          </Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad, gap: 12 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Client */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Client</Text>
+          {name ? <Text style={styles.valueMain}>{name}</Text> : null}
+          {email ? (
+            <View style={styles.infoRow}>
+              <Ionicons name="mail-outline" size={15} color={theme.textTertiary} />
+              <Text style={styles.valueSub}>{email}</Text>
+            </View>
+          ) : null}
+          {phone ? (
+            <View style={styles.infoRow}>
+              <Ionicons name="call-outline" size={15} color={theme.textTertiary} />
+              <Text style={styles.valueSub}>{phone}</Text>
+            </View>
+          ) : null}
+          {!name && !email && !phone && (
+            <Text style={styles.valueSub}>—</Text>
+          )}
+        </View>
+
+        {/* Dates & Reference */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Informations</Text>
+          {q.quoteNumber || q.reference ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Référence</Text>
+              <Text style={styles.value}>{q.quoteNumber || q.reference}</Text>
+            </View>
+          ) : null}
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Date de création</Text>
+            <Text style={styles.value}>{fmtDate(q.createdAt)}</Text>
+          </View>
+          {q.expiryDate || q.validUntil ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Validité</Text>
+              <Text style={styles.value}>{fmtDate(q.expiryDate || q.validUntil)}</Text>
+            </View>
+          ) : null}
+          {(q.vehicleInfo?.brand || q.vehicleInfo?.model || q.vehicleInfo?.plate) ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Véhicule</Text>
+              <Text style={styles.value}>
+                {[q.vehicleInfo?.brand, q.vehicleInfo?.model, q.vehicleInfo?.plate].filter(Boolean).join(" · ")}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Description */}
+        {q.description || q.notes ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description / Notes</Text>
+            {q.description ? <Text style={styles.prose}>{q.description}</Text> : null}
+            {q.notes && q.notes !== q.description ? <Text style={styles.prose}>{q.notes}</Text> : null}
+          </View>
+        ) : null}
+
+        {/* Line Items */}
+        {items.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Prestations</Text>
+            {items.map((it: any, i: number) => {
+              const qty = it.quantity ?? 1;
+              const unitHT = it.unitPriceExcludingTax ?? it.unitPrice ?? it.price ?? 0;
+              const tva = it.taxRate ?? it.tvaRate ?? 0;
+              const lineTotal = it.totalIncludingTax ?? it.totalPrice ?? (parseFloat(String(unitHT)) * parseFloat(String(qty)) * (1 + parseFloat(String(tva)) / 100));
+              return (
+                <View key={i} style={[styles.lineItem, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
+                  <Text style={styles.lineDesc}>{it.description || it.name || `Ligne ${i + 1}`}</Text>
+                  <View style={styles.lineRow}>
+                    <Text style={styles.lineDetail}>{qty} × {fmtEur(unitHT)} HT</Text>
+                    {parseFloat(String(tva)) > 0 ? (
+                      <Text style={styles.lineDetail}>TVA {tva}%</Text>
+                    ) : null}
+                    <Text style={styles.lineTotal}>{fmtEur(lineTotal)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {/* Totals */}
+        {(totalHT || totalTTC) ? (
+          <View style={[styles.section, { gap: 6 }]}>
+            <Text style={styles.sectionTitle}>Totaux</Text>
+            {totalHT ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total HT</Text>
+                <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
+              </View>
+            ) : null}
+            {totalTVA ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>TVA</Text>
+                <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
+              </View>
+            ) : null}
+            {totalTTC ? (
+              <View style={[styles.totalRow, styles.totalRowMain]}>
+                <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
+                <Text style={[styles.totalValue, { fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }]}>{fmtEur(totalTTC)}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* Photos */}
+        {photos.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Photos</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 4 }}>
+              {photos.map((uri: string, i: number) => (
+                <Image key={i} source={{ uri }} style={styles.photo} contentFit="cover" />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* PDF */}
+        {pdfUrl ? (
+          <Pressable style={styles.pdfBtn} onPress={handlePdf}>
+            <Ionicons name="document-text-outline" size={20} color="#fff" />
+            <Text style={styles.pdfBtnText}>Télécharger le PDF</Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+const getStyles = (theme: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  header: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 16, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
+  backChip: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.primary },
+  headerCenter: { flex: 1 },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: theme.text },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  section: {
+    backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1,
+    borderColor: theme.border, padding: 14, gap: 8,
+  },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
+  valueMain: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: theme.text },
+  valueSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary, flex: 1 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  label: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textTertiary, width: 110 },
+  value: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.text, flex: 1 },
+  prose: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text, lineHeight: 20 },
+  lineItem: { paddingVertical: 8, gap: 4 },
+  lineDesc: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text },
+  lineRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  lineDetail: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },
+  lineTotal: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.text, marginLeft: "auto" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalRowMain: { paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 },
+  totalLabel: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+  totalValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.text },
+  photo: { width: 120, height: 90, borderRadius: 10, marginRight: 8 },
+  pdfBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, backgroundColor: theme.primary, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 20,
+  },
+  pdfBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+});

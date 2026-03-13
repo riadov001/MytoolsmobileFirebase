@@ -1,0 +1,297 @@
+import React, { useMemo } from "react";
+import {
+  View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator, Linking,
+} from "react-native";
+import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
+import { adminInvoices } from "@/lib/admin-api";
+import { useTheme } from "@/lib/theme";
+import { ThemeColors } from "@/constants/theme";
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "En attente", paid: "Payée", cancelled: "Annulée",
+  overdue: "En retard", sent: "Envoyée", draft: "Brouillon",
+};
+const STATUS_COLORS: Record<string, string> = {
+  pending: "#F59E0B", paid: "#22C55E", cancelled: "#EF4444",
+  overdue: "#EF4444", sent: "#8B5CF6", draft: "#6B7280",
+};
+
+function clientName(inv: any): string {
+  const c = inv?.client;
+  if (c?.firstName || c?.lastName) return `${c.firstName || ""} ${c.lastName || ""}`.trim();
+  if (c?.name) return c.name;
+  if (inv?.clientFirstName || inv?.clientLastName) return `${inv.clientFirstName || ""} ${inv.clientLastName || ""}`.trim();
+  if (inv?.clientName) return inv.clientName;
+  return "";
+}
+function clientEmail(inv: any): string {
+  return inv?.client?.email || inv?.clientEmail || "";
+}
+function clientPhone(inv: any): string {
+  return inv?.client?.phone || inv?.clientPhone || inv?.client?.phoneNumber || "";
+}
+
+function fmtDate(val: string | null | undefined): string {
+  if (!val) return "—";
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return val;
+  return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+}
+function fmtEur(val: any): string {
+  const n = parseFloat(val);
+  if (isNaN(n)) return "—";
+  return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
+}
+
+export default function InvoiceDetailScreen() {
+  const params = useLocalSearchParams();
+  const rawId = params.id;
+  const id = Array.isArray(rawId) ? rawId[0] : (typeof rawId === "string" ? rawId : "");
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
+  const styles = useMemo(() => getStyles(theme), [theme]);
+
+  const { data: inv, isLoading, error } = useQuery({
+    queryKey: ["admin-invoice", id],
+    queryFn: () => adminInvoices.getById(id),
+    enabled: !!id,
+    retry: 1,
+  });
+
+  const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
+  const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
+
+  const handlePdf = async () => {
+    const url = inv?.pdfUrl || inv?.pdf_url || inv?.documentUrl;
+    if (!url) return;
+    Haptics.selectionAsync();
+    try {
+      await Linking.openURL(url);
+    } catch {}
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
+  if (error || !inv) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", gap: 16 }]}>
+        <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
+        <Text style={{ fontSize: 15, color: theme.text, textAlign: "center", paddingHorizontal: 32 }}>
+          Impossible de charger cette facture.
+        </Text>
+        <Pressable style={styles.backChip} onPress={() => router.back()}>
+          <Text style={{ color: theme.primary, fontFamily: "Inter_600SemiBold" }}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  const statusKey = (inv.status || "").toLowerCase();
+  const statusColor = STATUS_COLORS[statusKey] || theme.textTertiary;
+  const statusLabel = STATUS_LABELS[statusKey] || inv.status;
+
+  const items: any[] = inv.items || inv.lineItems || inv.lines || inv.invoice_lines || [];
+  const totalHT = inv.priceExcludingTax || inv.totalHT || inv.totalExcludingTax || inv.subtotal || "";
+  const totalTVA = inv.taxAmount || inv.tvaAmount || inv.taxTotal || "";
+  const totalTTC = inv.amount || inv.totalTTC || inv.total || inv.totalIncludingTax || "";
+  const pdfUrl = inv.pdfUrl || inv.pdf_url || inv.documentUrl;
+
+  const name = clientName(inv);
+  const email = clientEmail(inv);
+  const phone = clientPhone(inv);
+
+  return (
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: topPad }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </Pressable>
+        <View style={styles.headerCenter}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {inv.invoiceNumber || inv.reference || "Facture"}
+          </Text>
+        </View>
+        <View style={[styles.statusBadge, { backgroundColor: statusColor + "20" }]}>
+          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: bottomPad, gap: 12 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Client */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Client</Text>
+          {name ? <Text style={styles.valueMain}>{name}</Text> : null}
+          {email ? (
+            <View style={styles.infoRow}>
+              <Ionicons name="mail-outline" size={15} color={theme.textTertiary} />
+              <Text style={styles.valueSub}>{email}</Text>
+            </View>
+          ) : null}
+          {phone ? (
+            <View style={styles.infoRow}>
+              <Ionicons name="call-outline" size={15} color={theme.textTertiary} />
+              <Text style={styles.valueSub}>{phone}</Text>
+            </View>
+          ) : null}
+          {!name && !email && !phone && (
+            <Text style={styles.valueSub}>—</Text>
+          )}
+        </View>
+
+        {/* Informations */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Informations</Text>
+          {inv.invoiceNumber || inv.reference ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Numéro</Text>
+              <Text style={styles.value}>{inv.invoiceNumber || inv.reference}</Text>
+            </View>
+          ) : null}
+          <View style={styles.infoRow}>
+            <Text style={styles.label}>Date d'émission</Text>
+            <Text style={styles.value}>{fmtDate(inv.createdAt || inv.issuedAt)}</Text>
+          </View>
+          {inv.dueDate ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Échéance</Text>
+              <Text style={styles.value}>{fmtDate(inv.dueDate)}</Text>
+            </View>
+          ) : null}
+          {inv.paidAt ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Payée le</Text>
+              <Text style={styles.value}>{fmtDate(inv.paidAt)}</Text>
+            </View>
+          ) : null}
+          {inv.paymentMethod ? (
+            <View style={styles.infoRow}>
+              <Text style={styles.label}>Paiement</Text>
+              <Text style={styles.value}>{inv.paymentMethod}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Description / Notes */}
+        {inv.description || inv.notes ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Description / Notes</Text>
+            {inv.description ? <Text style={styles.prose}>{inv.description}</Text> : null}
+            {inv.notes && inv.notes !== inv.description ? <Text style={styles.prose}>{inv.notes}</Text> : null}
+          </View>
+        ) : null}
+
+        {/* Line Items */}
+        {items.length > 0 ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Prestations</Text>
+            {items.map((it: any, i: number) => {
+              const qty = it.quantity ?? 1;
+              const unitHT = it.unitPriceExcludingTax ?? it.unitPrice ?? it.price ?? 0;
+              const tva = it.taxRate ?? it.tvaRate ?? 0;
+              const lineTotal = it.totalIncludingTax ?? it.totalPrice ?? (parseFloat(String(unitHT)) * parseFloat(String(qty)) * (1 + parseFloat(String(tva)) / 100));
+              return (
+                <View key={i} style={[styles.lineItem, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
+                  <Text style={styles.lineDesc}>{it.description || it.name || `Ligne ${i + 1}`}</Text>
+                  <View style={styles.lineRow}>
+                    <Text style={styles.lineDetail}>{qty} × {fmtEur(unitHT)} HT</Text>
+                    {parseFloat(String(tva)) > 0 ? (
+                      <Text style={styles.lineDetail}>TVA {tva}%</Text>
+                    ) : null}
+                    <Text style={styles.lineTotal}>{fmtEur(lineTotal)}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        ) : null}
+
+        {/* Totaux */}
+        {(totalHT || totalTTC) ? (
+          <View style={[styles.section, { gap: 6 }]}>
+            <Text style={styles.sectionTitle}>Totaux</Text>
+            {totalHT ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>Total HT</Text>
+                <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
+              </View>
+            ) : null}
+            {totalTVA ? (
+              <View style={styles.totalRow}>
+                <Text style={styles.totalLabel}>TVA</Text>
+                <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
+              </View>
+            ) : null}
+            {totalTTC ? (
+              <View style={[styles.totalRow, styles.totalRowMain]}>
+                <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
+                <Text style={[styles.totalValue, { fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }]}>{fmtEur(totalTTC)}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
+        {/* PDF */}
+        {pdfUrl ? (
+          <Pressable style={styles.pdfBtn} onPress={handlePdf}>
+            <Ionicons name="document-text-outline" size={20} color="#fff" />
+            <Text style={styles.pdfBtnText}>Télécharger le PDF</Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
+    </View>
+  );
+}
+
+const getStyles = (theme: ThemeColors) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: theme.background },
+  header: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 16, paddingBottom: 14,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
+  },
+  backBtn: { width: 40, height: 40, justifyContent: "center", alignItems: "center" },
+  backChip: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: theme.primary },
+  headerCenter: { flex: 1 },
+  headerTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: theme.text },
+  statusBadge: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8 },
+  statusText: { fontSize: 12, fontFamily: "Inter_600SemiBold" },
+  section: {
+    backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1,
+    borderColor: theme.border, padding: 14, gap: 8,
+  },
+  sectionTitle: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: theme.textTertiary, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 2 },
+  valueMain: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: theme.text },
+  valueSub: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary, flex: 1 },
+  infoRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  label: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textTertiary, width: 110 },
+  value: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.text, flex: 1 },
+  prose: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text, lineHeight: 20 },
+  lineItem: { paddingVertical: 8, gap: 4 },
+  lineDesc: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text },
+  lineRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  lineDetail: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },
+  lineTotal: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.text, marginLeft: "auto" },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalRowMain: { paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 },
+  totalLabel: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.textSecondary },
+  totalValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.text },
+  pdfBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center",
+    gap: 8, backgroundColor: theme.primary, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 20,
+  },
+  pdfBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+});
