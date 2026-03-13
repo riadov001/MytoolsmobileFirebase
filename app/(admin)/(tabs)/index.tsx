@@ -26,6 +26,9 @@ export default function AdminDashboard() {
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ["admin-analytics"],
     queryFn: adminAnalytics.get,
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   });
 
   const userRole = (user?.role || "").toLowerCase();
@@ -167,10 +170,10 @@ export default function AdminDashboard() {
           <>
             <Text style={styles.sectionLabel}>Statut des factures</Text>
             <View style={styles.statusCard}>
-              <StatusRow label="Payées" count={invStats.paid || 0} color="#22C55E" />
-              <StatusRow label="En attente" count={invStats.pending || 0} color="#F59E0B" />
-              <StatusRow label="En retard" count={invStats.overdue || 0} color="#EF4444" />
-              <StatusRow label="Annulées" count={invStats.cancelled || 0} color={theme.textTertiary} last />
+              <StatusRow theme={theme} label="Payées" count={invStats.paid || 0} color={theme.success} />
+              <StatusRow theme={theme} label="En attente" count={invStats.pending || 0} color={theme.warning} />
+              <StatusRow theme={theme} label="En retard" count={invStats.overdue || 0} color={theme.error} />
+              <StatusRow theme={theme} label="Annulées" count={invStats.cancelled || 0} color={theme.textTertiary} last />
             </View>
           </>
         )}
@@ -179,10 +182,10 @@ export default function AdminDashboard() {
           <>
             <Text style={styles.sectionLabel}>Statut des devis</Text>
             <View style={styles.statusCard}>
-              <StatusRow label="En attente" count={qStats.pending || 0} color="#F59E0B" />
-              <StatusRow label="Approuvés" count={qStats.approved || 0} color="#22C55E" />
-              <StatusRow label="Rejetés" count={qStats.rejected || 0} color="#EF4444" />
-              <StatusRow label="Convertis" count={qStats.completed || 0} color="#3B82F6" last />
+              <StatusRow theme={theme} label="En attente" count={qStats.pending || 0} color={theme.warning} />
+              <StatusRow theme={theme} label="Approuvés" count={qStats.approved || 0} color={theme.success} />
+              <StatusRow theme={theme} label="Rejetés" count={qStats.rejected || 0} color={theme.error} />
+              <StatusRow theme={theme} label="Convertis" count={qStats.completed || 0} color={theme.primary} last />
             </View>
           </>
         )}
@@ -194,6 +197,7 @@ export default function AdminDashboard() {
               {serviceStats.map((s: any, i: number) => (
                 <StatusRow
                   key={s.name}
+                  theme={theme}
                   label={s.name}
                   count={s.count || 0}
                   color={theme.primary}
@@ -209,12 +213,12 @@ export default function AdminDashboard() {
   );
 }
 
-function StatusRow({ label, count, color, last = false, suffix = "" }: { label: string; count: number; color: string; last?: boolean; suffix?: string }) {
+function StatusRow({ label, count, color, last = false, suffix = "", theme }: { label: string; count: number; color: string; last?: boolean; suffix?: string; theme: ThemeColors }) {
   return (
-    <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 12 }, !last && { borderBottomWidth: 1, borderBottomColor: "#00000010" }]}>
+    <View style={[{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 14, paddingVertical: 12 }, !last && { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
       <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
-        <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: "#000000CC" }}>{label}</Text>
+        <Text style={{ fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text }}>{label}</Text>
       </View>
       <Text style={{ fontSize: 14, fontFamily: "Inter_600SemiBold", color }}>{count}{suffix ? " " + suffix : ""}</Text>
     </View>
