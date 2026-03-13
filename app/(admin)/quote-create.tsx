@@ -18,6 +18,7 @@ interface LineItem {
   quantity: string;
   unitPrice: string;
   tvaRate: string;
+  fromServiceId?: string;
 }
 
 const TVA_OPTIONS = ["0", "10", "20"];
@@ -125,20 +126,24 @@ export default function QuoteCreateScreen() {
     setSelectedServices(prev => {
       const newSelection = prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId];
       
-      // Auto-fill line items when services are selected
       if (newSelection.length > 0) {
         const selectedServiceObjs = servicesArr.filter((s: any) => newSelection.includes(s.id));
-        const newItems = selectedServiceObjs.map((s: any) => ({
+        const serviceItems: LineItem[] = selectedServiceObjs.map((s: any) => ({
           description: s.name || s.label || "",
           quantity: "1",
-          unitPrice: String(s.price || s.unitPrice || s.basePrice || 0),
+          unitPrice: String(s.price || s.unitPrice || s.basePrice || s.priceHT || s.priceExcludingTax || s.hourlyRate || s.rate || 0),
           tvaRate: String(s.taxRate || s.tvaRate || "20"),
+          fromServiceId: s.id,
         }));
-        // Replace all empty line items or rebuild from services
-        setLineItems(newItems.length > 0 ? newItems : [{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
+        setLineItems(prev => {
+          const freeFormItems = prev.filter(it => !it.fromServiceId && it.description.trim());
+          return [...serviceItems, ...freeFormItems];
+        });
       } else if (newSelection.length === 0) {
-        // Reset to empty line item when no services selected
-        setLineItems([{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
+        setLineItems(prev => {
+          const freeFormItems = prev.filter(it => !it.fromServiceId && it.description.trim());
+          return freeFormItems.length > 0 ? freeFormItems : [{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }];
+        });
       }
       return newSelection;
     });
@@ -346,7 +351,7 @@ export default function QuoteCreateScreen() {
         {/* Services */}
         {servicesArr.length > 0 ? (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Services disponibles (optionnel)</Text>
+            <Text style={styles.sectionTitle}>Services *</Text>
             <Pressable style={styles.pickerBtn} onPress={() => setShowServicesPicker(!showServicesPicker)}>
               <Text style={[styles.pickerText, selectedServices.length === 0 && { color: theme.textTertiary }]}>
                 {selectedServices.length === 0 ? "Sélectionner des services" : `${selectedServices.length} service(s) sélectionné(s)`}
@@ -358,18 +363,29 @@ export default function QuoteCreateScreen() {
                 scrollEnabled={false}
                 data={servicesArr}
                 keyExtractor={(s: any) => s.id}
-                renderItem={({ item: service }: { item: any }) => (
-                  <Pressable
-                    style={[styles.serviceOption, selectedServices.includes(service.id) && { backgroundColor: theme.primary + "20" }]}
-                    onPress={() => toggleService(service.id)}
-                  >
-                    <Ionicons name={selectedServices.includes(service.id) ? "checkmark-circle" : "ellipse-outline"} size={18} color={selectedServices.includes(service.id) ? theme.primary : theme.textTertiary} />
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.serviceName, selectedServices.includes(service.id) && { color: theme.primary }]}>{service.name || service.label}</Text>
-                      {service.description ? <Text style={styles.serviceDesc}>{service.description}</Text> : null}
-                    </View>
-                  </Pressable>
-                )}
+                renderItem={({ item: service }: { item: any }) => {
+                  const servicePrice = service.price || service.unitPrice || service.basePrice || service.priceHT || service.priceExcludingTax || service.hourlyRate || service.rate || 0;
+                  const isSelected = selectedServices.includes(service.id);
+                  return (
+                    <Pressable
+                      style={[styles.serviceOption, isSelected && { backgroundColor: theme.primary + "20" }]}
+                      onPress={() => toggleService(service.id)}
+                    >
+                      <Ionicons name={isSelected ? "checkmark-circle" : "ellipse-outline"} size={18} color={isSelected ? theme.primary : theme.textTertiary} />
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                          <Text style={[styles.serviceName, isSelected && { color: theme.primary }, { flex: 1 }]}>{service.name || service.label}</Text>
+                          {servicePrice > 0 && (
+                            <Text style={[styles.servicePrice, isSelected && { color: theme.primary }]}>
+                              {fmtEur(parseFloat(String(servicePrice)))} HT
+                            </Text>
+                          )}
+                        </View>
+                        {service.description ? <Text style={styles.serviceDesc}>{service.description}</Text> : null}
+                      </View>
+                    </Pressable>
+                  );
+                }}
               />
             )}
           </View>
@@ -409,66 +425,92 @@ export default function QuoteCreateScreen() {
         {/* Line Items */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Prestations *</Text>
-          {lineItems.map((item, idx) => (
-            <View key={idx} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
-              <View style={styles.lineItemHeader}>
-                <Text style={styles.lineItemLabel}>Prestation {idx + 1}</Text>
-                {lineItems.length > 1 && (
-                  <Pressable onPress={() => removeLineItem(idx)}>
-                    <Ionicons name="trash-outline" size={16} color="#EF4444" />
-                  </Pressable>
-                )}
-              </View>
-              <TextInput
-                style={styles.input}
-                placeholder="Description de la prestation"
-                placeholderTextColor={theme.textTertiary}
-                value={item.description}
-                onChangeText={v => updateLineItem(idx, "description", v)}
-              />
-              <View style={styles.lineItemRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Qté</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="1"
-                    placeholderTextColor={theme.textTertiary}
-                    value={item.quantity}
-                    onChangeText={v => updateLineItem(idx, "quantity", v)}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                <View style={{ flex: 2 }}>
-                  <Text style={styles.fieldLabel}>Prix HT (€)</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="0.00"
-                    placeholderTextColor={theme.textTertiary}
-                    value={item.unitPrice}
-                    onChangeText={v => updateLineItem(idx, "unitPrice", v)}
-                    keyboardType="decimal-pad"
-                  />
-                </View>
-                <View style={{ flex: 1.5 }}>
-                  <Text style={styles.fieldLabel}>TVA %</Text>
-                  <View style={styles.tvaSelector}>
-                    {TVA_OPTIONS.map(t => (
-                      <Pressable
-                        key={t}
-                        style={[styles.tvaBtn, item.tvaRate === t && { backgroundColor: theme.primary }]}
-                        onPress={() => updateLineItem(idx, "tvaRate", t)}
-                      >
-                        <Text style={[styles.tvaBtnText, item.tvaRate === t && { color: "#fff" }]}>{t}%</Text>
-                      </Pressable>
-                    ))}
+          {lineItems.map((item, idx) => {
+            const isLocked = !!item.fromServiceId;
+            return (
+              <View key={idx} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
+                <View style={styles.lineItemHeader}>
+                  <Text style={styles.lineItemLabel}>
+                    Prestation {idx + 1}
+                    {isLocked ? "  " : ""}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {isLocked && (
+                      <Ionicons name="lock-closed" size={13} color={theme.textTertiary} />
+                    )}
+                    <Pressable onPress={() => {
+                      if (isLocked) {
+                        setSelectedServices(prev => prev.filter(id => id !== item.fromServiceId));
+                      }
+                      removeLineItem(idx);
+                    }}>
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
+                    </Pressable>
                   </View>
                 </View>
+                {isLocked ? (
+                  <Text style={styles.lockedText}>{item.description}</Text>
+                ) : (
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Description de la prestation"
+                    placeholderTextColor={theme.textTertiary}
+                    value={item.description}
+                    onChangeText={v => updateLineItem(idx, "description", v)}
+                  />
+                )}
+                <View style={styles.lineItemRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.fieldLabel}>Qté</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="1"
+                      placeholderTextColor={theme.textTertiary}
+                      value={item.quantity}
+                      onChangeText={v => updateLineItem(idx, "quantity", v)}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                  <View style={{ flex: 2 }}>
+                    <Text style={styles.fieldLabel}>Prix HT (€)</Text>
+                    {isLocked ? (
+                      <Text style={styles.lockedFieldValue}>{item.unitPrice} €</Text>
+                    ) : (
+                      <TextInput
+                        style={styles.input}
+                        placeholder="0.00"
+                        placeholderTextColor={theme.textTertiary}
+                        value={item.unitPrice}
+                        onChangeText={v => updateLineItem(idx, "unitPrice", v)}
+                        keyboardType="decimal-pad"
+                      />
+                    )}
+                  </View>
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={styles.fieldLabel}>TVA %</Text>
+                    {isLocked ? (
+                      <Text style={styles.lockedFieldValue}>{item.tvaRate}%</Text>
+                    ) : (
+                      <View style={styles.tvaSelector}>
+                        {TVA_OPTIONS.map(t => (
+                          <Pressable
+                            key={t}
+                            style={[styles.tvaBtn, item.tvaRate === t && { backgroundColor: theme.primary }]}
+                            onPress={() => updateLineItem(idx, "tvaRate", t)}
+                          >
+                            <Text style={[styles.tvaBtnText, item.tvaRate === t && { color: "#fff" }]}>{t}%</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                </View>
+                <Text style={styles.lineTotalCalc}>
+                  Total TTC : {fmtEur(calcTTC(item))}
+                </Text>
               </View>
-              <Text style={styles.lineTotalCalc}>
-                Total TTC : {fmtEur(calcTTC(item))}
-              </Text>
-            </View>
-          ))}
+            );
+          })}
           <Pressable style={styles.addLineBtn} onPress={addLineItem}>
             <Ionicons name="add-circle-outline" size={20} color={theme.primary} />
             <Text style={styles.addLineBtnText}>Ajouter une prestation</Text>
@@ -578,6 +620,17 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   serviceOption: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: theme.border },
   serviceName: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text },
   serviceDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary, marginTop: 2 },
+  servicePrice: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: theme.textSecondary, marginLeft: 8 },
+  lockedText: {
+    fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: theme.surface,
+    borderRadius: 10, borderWidth: 1, borderColor: theme.border,
+  },
+  lockedFieldValue: {
+    fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text,
+    paddingHorizontal: 12, paddingVertical: 10, backgroundColor: theme.surface,
+    borderRadius: 10, borderWidth: 1, borderColor: theme.border,
+  },
   photoItem: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8, marginVertical: 4, backgroundColor: theme.background, borderRadius: 8, paddingHorizontal: 8 },
   photoThumb: { width: 50, height: 50, borderRadius: 6 },
   photoName: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },
