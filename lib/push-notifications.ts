@@ -96,16 +96,39 @@ async function isNotificationConsentGranted(): Promise<boolean> {
   }
 }
 
-async function showLocalNotification(notification: AppNotification) {
-  if (!Notifications) return;
+export async function requestWebNotificationPermission(): Promise<boolean> {
+  if (Platform.OS !== "web") return false;
+  if (typeof window === "undefined" || !("Notification" in window)) return false;
+  if ((window as any).Notification.permission === "granted") return true;
+  if ((window as any).Notification.permission === "denied") return false;
+  const result = await (window as any).Notification.requestPermission();
+  return result === "granted";
+}
 
+async function showLocalNotification(notification: AppNotification) {
   const consentOk = await isNotificationConsentGranted();
   if (!consentOk) return;
 
+  const title = notification.title || getNotificationSubtitle(notification.type);
+  const body = notification.message;
+
+  if (Platform.OS === "web") {
+    if (typeof window !== "undefined" && "Notification" in window) {
+      try {
+        if ((window as any).Notification.permission === "granted") {
+          new (window as any).Notification(title, { body, icon: "/favicon.ico" });
+        }
+      } catch {}
+    }
+    return;
+  }
+
+  if (!Notifications) return;
+
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: notification.title || getNotificationSubtitle(notification.type),
-      body: notification.message,
+      title,
+      body,
       data: {
         type: notification.type,
         relatedId: notification.relatedId,

@@ -5,7 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router } from "expo-router";
 import { authApi, UserProfile, LoginData, RegisterData, setSessionCookie, getSessionCookie } from "./api";
 import { adminLogin, adminGetMe, setAdminTokens, setOnTokenExpired, getAdminAccessToken } from "./admin-api";
-import { registerForPushNotificationsAsync, startNotificationPolling, stopNotificationPolling, addNotificationResponseListener } from "./push-notifications";
+import { registerForPushNotificationsAsync, startNotificationPolling, stopNotificationPolling, addNotificationResponseListener, requestWebNotificationPermission } from "./push-notifications";
 import { adminNotifications } from "./admin-api";
 
 let LocalAuthentication: any = null;
@@ -95,7 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const consent = await AsyncStorage.getItem("consent_notifications").catch(() => null);
         if (consent === "false") return;
 
-        if (Platform.OS !== "web") {
+        if (Platform.OS === "web") {
+          requestWebNotificationPermission().catch(() => {});
+        } else {
           registerForPushNotificationsAsync().catch(() => {});
         }
         const fetchFn = isAdminOrEmp ? adminNotifications.getAll : undefined;
