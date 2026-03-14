@@ -211,7 +211,7 @@ L'application est conforme au RGPD (Reglement General sur la Protection des Donn
 4. **Politique de confidentialite** : Accessible depuis le profil et l'ecran de consentement
 5. **Mentions legales** : Accessibles depuis le profil et l'ecran de consentement
 6. **Pas de tracking publicitaire** : Aucun SDK publicitaire, aucun suivi utilisateur
-
+5
 ---
 
 ## Configuration technique

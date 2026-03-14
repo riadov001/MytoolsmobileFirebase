@@ -4,7 +4,7 @@ import express from "express";
 // server/routes.ts
 import { createServer } from "node:http";
 import pg from "pg";
-var EXTERNAL_API = "https://appmyjantes1.mytoolsgroup.eu";
+var EXTERNAL_API = "https://saas.mytoolsgroup.eu";
 var pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL
 });

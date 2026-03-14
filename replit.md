@@ -19,8 +19,7 @@ Application mobile Expo React Native **exclusivement réservée aux administrate
 ## API Backend
 Base URL: Configurable via `EXTERNAL_API_URL` env var (default: `https://apps.mytoolsgroup.eu/api`)
 
-### Endpoints principaux
-- `POST /api/register` - Inscription (email, password, firstName, lastName, role, etc.)
+### Endpoints saas` - Inscription (email, password, firstName, lastName, role, etc.)
 - `POST /api/login` - Connexion (email, password) → retourne user + cookie session
 - `POST /api/logout` - Déconnexion
 - `GET /api/auth/user` - Profil utilisateur authentifié
