@@ -222,9 +222,11 @@ export default function InvoiceCreateScreen() {
       })),
       totalHT: totalHT.toFixed(2),
       totalTTC: totalTTC.toFixed(2),
+      totalAmount: totalTTC.toFixed(2),
       amount: totalTTC.toFixed(2),
       total: totalTTC.toFixed(2),
       priceExcludingTax: totalHT.toFixed(2),
+      totalExcludingTax: totalHT.toFixed(2),
       taxAmount: totalTVA.toFixed(2),
     };
 

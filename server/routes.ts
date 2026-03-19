@@ -1296,7 +1296,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ success: false, message: "Cette fonctionnalité n'est pas disponible sur ce serveur." });
     }
 
-    console.log(`[MOBILE-CRUD] ${req.method} /${usedSeg}${urlSuffix} => ${result.status}`);
+    if (result.status >= 400) {
+      console.log(`[MOBILE-CRUD-ERR] ${req.method} /${usedSeg}${urlSuffix} => ${result.status} body: ${result.text.substring(0, 800)}`);
+    } else {
+      console.log(`[MOBILE-CRUD] ${req.method} /${usedSeg}${urlSuffix} => ${result.status}`);
+    }
     result.headers.forEach((value, key) => {
       const lk = key.toLowerCase();
       if (["transfer-encoding", "content-encoding", "content-length"].includes(lk)) return;

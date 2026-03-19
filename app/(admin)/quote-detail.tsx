@@ -97,10 +97,12 @@ export default function QuoteDetailScreen() {
       const tva = Number(quote?.taxAmount || quote?.tvaAmount || quote?.taxTotal || 0);
       const body: any = {
         amount: ttc,
+        totalAmount: ttc,
         totalTTC: ttc,
         total: ttc,
         totalHT: ht,
         priceExcludingTax: ht,
+        totalExcludingTax: ht,
         taxAmount: tva,
         clientId: quote?.clientId,
         quoteId: id,
