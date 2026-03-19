@@ -58,15 +58,6 @@ function fmtEur(n: number): string {
   return n.toLocaleString("fr-FR", { style: "currency", currency: "EUR" });
 }
 
-function getToday(): string {
-  return new Date().toISOString().split("T")[0];
-}
-
-function getDefaultDueDate(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() + 1);
-  return d.toISOString().split("T")[0];
-}
 
 export default function InvoiceCreateScreen() {
   const params = useLocalSearchParams();
@@ -82,8 +73,6 @@ export default function InvoiceCreateScreen() {
   const [clientSearch, setClientSearch] = useState("");
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [notes, setNotes] = useState("");
-  const [issueDate] = useState(getToday());
-  const [dueDate] = useState(getDefaultDueDate());
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
@@ -233,8 +222,10 @@ export default function InvoiceCreateScreen() {
     };
 
     if (notes.trim()) payload.notes = notes.trim();
-    payload.dueDate = dueDate;
-    payload.issueDate = issueDate;
+    payload.issueDate = new Date().toISOString().split("T")[0];
+    const dueDate = new Date();
+    dueDate.setMonth(dueDate.getMonth() + 1);
+    payload.dueDate = dueDate.toISOString().split("T")[0];
     if (paymentMethod) payload.paymentMethod = paymentMethod;
 
     console.log("[INVOICE-CREATE] Payload items:", mappedItems.length, "photos:", photos.length, "totalTTC:", totalTTC);
@@ -314,19 +305,6 @@ export default function InvoiceCreateScreen() {
               </ScrollView>
             </View>
           )}
-        </View>
-
-        {/* Dates */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Dates</Text>
-          <View style={styles.dateReadRow}>
-            <Text style={styles.dateReadLabel}>Date d'émission</Text>
-            <Text style={styles.dateReadValue}>{issueDate}</Text>
-          </View>
-          <View style={styles.dateReadRow}>
-            <Text style={styles.dateReadLabel}>Date d'échéance</Text>
-            <Text style={styles.dateReadValue}>{dueDate}</Text>
-          </View>
         </View>
 
         {/* Mode de paiement */}
@@ -541,9 +519,6 @@ export default function InvoiceCreateScreen() {
 
 function getStyles(theme: ThemeColors) {
   return StyleSheet.create({
-    dateReadRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 10 },
-    dateReadLabel: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary },
-    dateReadValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.primary },
     container: { flex: 1, backgroundColor: theme.background },
     header: {
       flexDirection: "row",
