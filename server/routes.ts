@@ -1368,7 +1368,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const txt = await r.text();
         if (txt.includes("<!DOCTYPE") || txt.includes("<html")) return null;
         const parsed = JSON.parse(txt);
-        if (r.ok && parsed && !parsed.message?.toLowerCase().includes("unexpected") && !parsed.error?.toLowerCase().includes("unexpected")) {
+        const msgStr = typeof parsed?.message === "string" ? parsed.message.toLowerCase() : "";
+        const errStr = typeof parsed?.error === "string" ? parsed.error.toLowerCase() : "";
+        if (r.ok && parsed && !msgStr.includes("unexpected") && !errStr.includes("unexpected")) {
           return { status: r.status, data: parsed };
         }
         return null;
@@ -1400,8 +1402,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const txt = await r.text();
           if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
             const parsed = JSON.parse(txt);
-            if (r.ok && parsed && (parsed.id || parsed.clientId)) {
-              quoteData = parsed;
+            const unwrapped = parsed?.data ?? parsed;
+            if (r.ok && unwrapped && (unwrapped.id || unwrapped.clientId)) {
+              quoteData = unwrapped;
               console.log(`[CONVERT-INVOICE] Fetched quote from ${seg}/${id}`);
               break;
             }
@@ -1488,31 +1491,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch {}
       }
 
-      console.log(`[CONVERT-INVOICE] All endpoints failed, returning synthetic invoice`);
-      return res.status(201).json({
-        id: `invoice-${id}-${Date.now()}`,
-        quoteId: id,
-        clientId,
-        status: "pending",
-        items: mappedItems,
-        totalHT: totalHT.toFixed(2),
-        totalTTC: totalTTC.toFixed(2),
-        taxAmount: (totalTTC - totalHT).toFixed(2),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      console.log(`[CONVERT-INVOICE] All invoice creation endpoints failed for quote ${id}`);
+      return res.status(502).json({ success: false, message: "Impossible de créer la facture. Veuillez réessayer." });
     } catch (err) {
       console.log(`[CONVERT-INVOICE] Fallback error:`, err);
-      return res.status(201).json({
-        id: `invoice-${id}-${Date.now()}`,
-        quoteId: id,
-        status: "pending",
-        items: [],
-        totalHT: "0.00",
-        totalTTC: "0.00",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      return res.status(502).json({ success: false, message: "Erreur lors de la création de la facture." });
     }
   });
 
