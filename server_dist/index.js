@@ -1394,7 +1394,7 @@ async function registerRoutes(app2) {
     };
     if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"];
     if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"];
-    const fetchOpts = { method: "POST", headers: authHeaders, redirect: "manual", body: JSON.stringify(req.body || {}) };
+    const fetchOpts = { method: "POST", headers: authHeaders, redirect: "manual" };
     const tryConvertUrl = async (url) => {
       try {
         const r = await fetch(url, fetchOpts);

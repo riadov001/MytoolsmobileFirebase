@@ -1360,7 +1360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"] as string;
     if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"] as string;
 
-    const fetchOpts: RequestInit = { method: "POST", headers: authHeaders, redirect: "manual", body: JSON.stringify(req.body || {}) };
+    const fetchOpts: RequestInit = { method: "POST", headers: authHeaders, redirect: "manual" };
 
     const tryConvertUrl = async (url: string) => {
       try {
