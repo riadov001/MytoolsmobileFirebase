@@ -526,23 +526,21 @@ export default function QuoteCreateScreen() {
         </View>
 
         {/* Totaux */}
-        {totalTTC > 0 ? (
-          <View style={[styles.section, { gap: 6 }]}>
-            <Text style={styles.sectionTitle}>Récapitulatif</Text>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total HT</Text>
-              <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>TVA</Text>
-              <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
-            </View>
-            <View style={[styles.totalRow, { paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 }]}>
-              <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
-              <Text style={{ fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }}>{fmtEur(totalTTC)}</Text>
-            </View>
+        <View style={[styles.section, { gap: 6 }]}>
+          <Text style={styles.sectionTitle}>Récapitulatif</Text>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total HT</Text>
+            <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
           </View>
-        ) : null}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TVA</Text>
+            <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
+          </View>
+          <View style={[styles.totalRow, { paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 }]}>
+            <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
+            <Text style={{ fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }}>{fmtEur(totalTTC)}</Text>
+          </View>
+        </View>
 
         {/* Submit */}
         <Pressable
