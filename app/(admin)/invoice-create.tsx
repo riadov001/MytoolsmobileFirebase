@@ -186,13 +186,17 @@ export default function InvoiceCreateScreen() {
   const { totalHT, totalTVA, totalTTC } = calcTotals(lineItems);
 
   const handleSubmit = () => {
+    if (!selectedQuoteId) {
+      showAlert({ type: "warning", title: "Attention", message: "Veuillez sélectionner un devis source.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
     if (!selectedClientId) {
       showAlert({ type: "warning", title: "Attention", message: "Veuillez sélectionner un client.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
     const validItems = lineItems.filter(it => it.description.trim() && it.unitPrice);
     if (validItems.length === 0) {
-      showAlert({ type: "warning", title: "Attention", message: "Ajoutez au moins une prestation avec une description et un prix.", buttons: [{ text: "OK", style: "primary" }] });
+      showAlert({ type: "warning", title: "Attention", message: "Veuillez remplir toutes les prestations avec une description et un prix.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
 
@@ -279,7 +283,7 @@ export default function InvoiceCreateScreen() {
         {/* Quote Picker */}
         <View style={styles.section}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-            <Text style={styles.sectionTitle}>Devis source</Text>
+            <Text style={styles.sectionTitle}>Devis source *</Text>
             {selectedQuote && (
               <Pressable onPress={() => { setSelectedQuoteId(null); setLineItems([{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]); setSelectedClientId(null); setNotes(""); }}>
                 <Text style={{ fontSize: 11, color: theme.textTertiary, fontFamily: "Inter_400Regular" }}>Effacer</Text>
@@ -472,7 +476,7 @@ export default function InvoiceCreateScreen() {
 
         {/* Prestations */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Prestations {selectedQuoteId ? "(depuis le devis)" : "*"}</Text>
+          <Text style={styles.sectionTitle}>Prestations *</Text>
           {lineItems.map((item, idx) => (
             <View key={idx} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
               <View style={styles.lineItemHeader}>

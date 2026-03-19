@@ -192,32 +192,50 @@ export default function QuoteCreateScreen() {
       status: "pending",
       notes: notes.trim() || undefined,
       description: notes.trim() || undefined,
-      items: validItems.map(it => ({
-        description: it.description.trim(),
-        quantity: parseFloat(it.quantity) || 1,
-        unitPrice: parseFloat(it.unitPrice) || 0,
-        unitPriceExcludingTax: parseFloat(it.unitPrice) || 0,
-        taxRate: parseFloat(it.tvaRate) || 0,
-        tvaRate: parseFloat(it.tvaRate) || 0,
-        totalPrice: calcTTC(it),
-        totalIncludingTax: calcTTC(it),
-      })),
-      lineItems: validItems.map(it => ({
-        description: it.description.trim(),
-        quantity: parseFloat(it.quantity) || 1,
-        unitPrice: parseFloat(it.unitPrice) || 0,
-        unitPriceExcludingTax: parseFloat(it.unitPrice) || 0,
-        taxRate: parseFloat(it.tvaRate) || 0,
-        tvaRate: parseFloat(it.tvaRate) || 0,
-        totalPrice: calcTTC(it),
-        totalIncludingTax: calcTTC(it),
-      })),
+      items: validItems.map(it => {
+        const qty = parseFloat(it.quantity) || 1;
+        const price = parseFloat(it.unitPrice) || 0;
+        const tax = parseFloat(it.tvaRate) || 0;
+        const totalHT = qty * price;
+        const totalTTCItem = totalHT * (1 + tax / 100);
+        return {
+          description: it.description.trim(),
+          quantity: qty,
+          unitPrice: price,
+          unitPriceExcludingTax: price,
+          taxRate: tax,
+          tvaRate: tax,
+          totalPrice: totalTTCItem,
+          totalIncludingTax: totalTTCItem,
+          totalExcludingTax: totalHT,
+        };
+      }),
+      lineItems: validItems.map(it => {
+        const qty = parseFloat(it.quantity) || 1;
+        const price = parseFloat(it.unitPrice) || 0;
+        const tax = parseFloat(it.tvaRate) || 0;
+        const totalHT = qty * price;
+        const totalTTCItem = totalHT * (1 + tax / 100);
+        return {
+          description: it.description.trim(),
+          quantity: qty,
+          unitPrice: price,
+          unitPriceExcludingTax: price,
+          taxRate: tax,
+          tvaRate: tax,
+          totalPrice: totalTTCItem,
+          totalIncludingTax: totalTTCItem,
+          totalExcludingTax: totalHT,
+        };
+      }),
       totalHT: totalHT.toFixed(2),
       totalTTC: totalTTC.toFixed(2),
+      totalAmount: totalTTC.toFixed(2),
       quoteAmount: totalTTC.toFixed(2),
       amount: totalTTC.toFixed(2),
       total: totalTTC.toFixed(2),
       priceExcludingTax: totalHT.toFixed(2),
+      totalExcludingTax: totalHT.toFixed(2),
       taxAmount: totalTVA.toFixed(2),
     };
 
