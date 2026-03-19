@@ -176,6 +176,10 @@ export default function QuoteCreateScreen() {
       Alert.alert("Attention", "Veuillez sélectionner un client.");
       return;
     }
+    if (photos.length === 0) {
+      Alert.alert("Attention", "Au moins une photo est obligatoire pour créer un devis.");
+      return;
+    }
     if (photos.length > 3) {
       Alert.alert("Attention", "Maximum 3 photos autorisées.");
       return;
@@ -186,78 +190,65 @@ export default function QuoteCreateScreen() {
       return;
     }
 
-    const payload: any = {
-      clientId: selectedClientId,
-      serviceId: selectedServices[0],
-      status: "pending",
-      notes: notes.trim() || undefined,
-      description: notes.trim() || undefined,
-      items: validItems.map(it => {
-        const qty = parseFloat(it.quantity) || 1;
-        const price = parseFloat(it.unitPrice) || 0;
-        const tax = parseFloat(it.tvaRate) || 0;
-        const totalHT = qty * price;
-        const totalTTCItem = totalHT * (1 + tax / 100);
-        return {
-          description: it.description.trim(),
-          quantity: qty,
-          unitPrice: price,
-          unitPriceExcludingTax: price,
-          taxRate: tax,
-          tvaRate: tax,
-          totalPrice: totalTTCItem,
-          totalIncludingTax: totalTTCItem,
-          totalExcludingTax: totalHT,
-        };
-      }),
-      lineItems: validItems.map(it => {
-        const qty = parseFloat(it.quantity) || 1;
-        const price = parseFloat(it.unitPrice) || 0;
-        const tax = parseFloat(it.tvaRate) || 0;
-        const totalHT = qty * price;
-        const totalTTCItem = totalHT * (1 + tax / 100);
-        return {
-          description: it.description.trim(),
-          quantity: qty,
-          unitPrice: price,
-          unitPriceExcludingTax: price,
-          taxRate: tax,
-          tvaRate: tax,
-          totalPrice: totalTTCItem,
-          totalIncludingTax: totalTTCItem,
-          totalExcludingTax: totalHT,
-        };
-      }),
-      totalHT: totalHT.toFixed(2),
-      totalTTC: totalTTC.toFixed(2),
-      totalAmount: totalTTC.toFixed(2),
-      quoteAmount: totalTTC.toFixed(2),
-      amount: totalTTC.toFixed(2),
-      total: totalTTC.toFixed(2),
-      priceExcludingTax: totalHT.toFixed(2),
-      totalExcludingTax: totalHT.toFixed(2),
-      taxAmount: totalTVA.toFixed(2),
-    };
-
-    if (vehicleBrand || vehicleModel || vehiclePlate) {
-      payload.vehicleInfo = {
-        brand: vehicleBrand.trim() || undefined,
-        model: vehicleModel.trim() || undefined,
-        plate: vehiclePlate.trim() || undefined,
+    const mappedItems = validItems.map(it => {
+      const qty = parseFloat(it.quantity) || 1;
+      const price = parseFloat(it.unitPrice) || 0;
+      const tax = parseFloat(it.tvaRate) || 0;
+      const ht = qty * price;
+      const ttc = ht * (1 + tax / 100);
+      return {
+        description: it.description.trim(),
+        quantity: qty,
+        unitPrice: price,
+        unitPriceExcludingTax: price,
+        taxRate: tax,
+        tvaRate: tax,
+        totalPrice: ttc,
+        totalIncludingTax: ttc,
+        totalExcludingTax: ht,
       };
-    }
+    });
 
-    if (photos.length > 0) {
-      payload.photos = photos.map(p => p.uri);
-      payload.attachments = photos;
-    }
+    const vehicleInfo = (vehicleBrand || vehicleModel || vehiclePlate) ? {
+      brand: vehicleBrand.trim() || undefined,
+      model: vehicleModel.trim() || undefined,
+      plate: vehiclePlate.trim() || undefined,
+    } : undefined;
 
+    const formData = new FormData();
+    formData.append("clientId", selectedClientId);
+    formData.append("status", "pending");
+    if (notes.trim()) {
+      formData.append("notes", notes.trim());
+      formData.append("description", notes.trim());
+    }
+    if (selectedServices[0]) formData.append("serviceId", selectedServices[0]);
+    formData.append("items", JSON.stringify(mappedItems));
+    formData.append("lineItems", JSON.stringify(mappedItems));
+    formData.append("totalHT", totalHT.toFixed(2));
+    formData.append("totalTTC", totalTTC.toFixed(2));
+    formData.append("totalAmount", totalTTC.toFixed(2));
+    formData.append("quoteAmount", totalTTC.toFixed(2));
+    formData.append("amount", totalTTC.toFixed(2));
+    formData.append("total", totalTTC.toFixed(2));
+    formData.append("priceExcludingTax", totalHT.toFixed(2));
+    formData.append("totalExcludingTax", totalHT.toFixed(2));
+    formData.append("taxAmount", totalTVA.toFixed(2));
+    if (vehicleInfo) formData.append("vehicleInfo", JSON.stringify(vehicleInfo));
     if (selectedServices.length > 0) {
-      payload.selectedServices = selectedServices;
-      payload.services = servicesArr.filter((s: any) => selectedServices.includes(s.id));
+      formData.append("selectedServices", JSON.stringify(selectedServices));
     }
 
-    createMutation.mutate(payload);
+    photos.forEach((photo, idx) => {
+      const ext = photo.name?.split(".").pop()?.toLowerCase() || "jpg";
+      const mimeType = ext === "png" ? "image/png" : ext === "heic" ? "image/heic" : "image/jpeg";
+      formData.append("photos", { uri: photo.uri, name: photo.name || `photo_${idx}.jpg`, type: mimeType } as any);
+      formData.append("mediaFiles", { uri: photo.uri, name: photo.name || `photo_${idx}.jpg`, type: mimeType } as any);
+      formData.append("attachments", { uri: photo.uri, name: photo.name || `photo_${idx}.jpg`, type: mimeType } as any);
+    });
+
+    console.log("[QUOTE-CREATE] FormData photos:", photos.length, "items:", mappedItems.length, "totalTTC:", totalTTC);
+    createMutation.mutate(formData);
   };
 
   return (
@@ -401,7 +392,7 @@ export default function QuoteCreateScreen() {
 
         {/* Photos */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Photos (optionnel, maximum 3)</Text>
+          <Text style={styles.sectionTitle}>Photos * (1 minimum, maximum 3)</Text>
           {photos.length > 0 ? (
             <FlatList
               scrollEnabled={false}

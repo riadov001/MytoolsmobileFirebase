@@ -132,7 +132,17 @@ export default function AdminQuotesScreen() {
     const serviceSummary = lineItems.length > 0
       ? lineItems.slice(0, 2).map((it: any) => it.description || it.name || "").filter(Boolean).join(" · ")
       : "";
-    const totalTTC = item.quoteAmount ?? item.amount ?? item.totalTTC ?? item.total ?? item.totalAmount ?? null;
+    const directAmount = item.quoteAmount ?? item.amount ?? item.totalTTC ?? item.total ?? item.totalAmount ?? null;
+    const computedFromItems = lineItems.length > 0
+      ? lineItems.reduce((sum: number, it: any) => {
+          const price = parseFloat(String(it.unitPrice ?? it.price ?? it.unitPriceExcludingTax ?? 0)) || 0;
+          const qty = parseFloat(String(it.quantity ?? 1)) || 1;
+          const tax = parseFloat(String(it.taxRate ?? it.tvaRate ?? 0)) || 0;
+          const lineTotal = it.totalIncludingTax ?? it.totalPrice ?? (qty * price * (1 + tax / 100));
+          return sum + (parseFloat(String(lineTotal)) || 0);
+        }, 0)
+      : null;
+    const totalTTC = directAmount ?? (computedFromItems && computedFromItems > 0 ? computedFromItems : null);
 
     return (
       <Pressable

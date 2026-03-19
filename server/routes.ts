@@ -1266,9 +1266,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const fetchOpts: RequestInit = { method: req.method, headers: authHeaders, redirect: "manual" };
     if (req.method !== "GET" && req.method !== "HEAD") {
-      fetchOpts.body = JSON.stringify(req.body);
-      if (req.method === "POST") {
-        console.log(`[MOBILE-CRUD-BODY] ${req.method} /${primarySegment}${urlSuffix} body:`, JSON.stringify(req.body).substring(0, 500));
+      const incomingCt = req.headers["content-type"] || "";
+      if (incomingCt.includes("multipart/form-data")) {
+        authHeaders["content-type"] = incomingCt;
+        fetchOpts.body = (req as any).rawBody as Buffer;
+        console.log(`[MOBILE-CRUD-BODY] ${req.method} /${primarySegment}${urlSuffix} multipart, size=${((req as any).rawBody as Buffer)?.length}`);
+      } else {
+        fetchOpts.body = JSON.stringify(req.body);
+        if (req.method === "POST") {
+          console.log(`[MOBILE-CRUD-BODY] ${req.method} /${primarySegment}${urlSuffix} body:`, JSON.stringify(req.body).substring(0, 500));
+        }
       }
     }
 
@@ -1299,7 +1306,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (result.status >= 400) {
       console.log(`[MOBILE-CRUD-ERR] ${req.method} /${usedSeg}${urlSuffix} => ${result.status} body: ${result.text.substring(0, 800)}`);
     } else {
-      console.log(`[MOBILE-CRUD] ${req.method} /${usedSeg}${urlSuffix} => ${result.status}`);
+      if (req.method === "POST") {
+        console.log(`[MOBILE-CRUD-RESP] ${req.method} /${usedSeg}${urlSuffix} => ${result.status} response: ${result.text.substring(0, 1000)}`);
+      } else {
+        console.log(`[MOBILE-CRUD] ${req.method} /${usedSeg}${urlSuffix} => ${result.status}`);
+      }
     }
     result.headers.forEach((value, key) => {
       const lk = key.toLowerCase();

@@ -198,9 +198,23 @@ export default function QuoteDetailScreen() {
   const { name, email, phone } = resolveClientFromMap(q, clientMap);
 
   const items: any[] = q.items || q.lineItems || q.lines || q.quote_items || [];
-  const totalHT = q.priceExcludingTax || q.totalHT || q.totalExcludingTax || q.subtotal || "";
-  const totalTVA = q.taxAmount || q.tvaAmount || q.taxTotal || "";
-  const totalTTC = q.quoteAmount || q.totalTTC || q.total || q.totalIncludingTax || q.amount || q.totalAmount || "";
+
+  const computedTotals = items.reduce((acc: { ht: number; ttc: number }, it: any) => {
+    const price = parseFloat(String(it.unitPrice ?? it.price ?? it.unitPriceExcludingTax ?? 0)) || 0;
+    const qty = parseFloat(String(it.quantity ?? 1)) || 1;
+    const tax = parseFloat(String(it.taxRate ?? it.tvaRate ?? 0)) || 0;
+    const lineHT = it.totalExcludingTax ?? (qty * price);
+    const lineTTC = it.totalIncludingTax ?? it.totalPrice ?? (qty * price * (1 + tax / 100));
+    return { ht: acc.ht + (parseFloat(String(lineHT)) || 0), ttc: acc.ttc + (parseFloat(String(lineTTC)) || 0) };
+  }, { ht: 0, ttc: 0 });
+
+  const rawTotalHT = q.priceExcludingTax || q.totalHT || q.totalExcludingTax || q.subtotal || q.pricingTotals?.totalHT;
+  const rawTotalTTC = q.quoteAmount || q.totalTTC || q.total || q.totalIncludingTax || q.amount || q.totalAmount || q.pricingTotals?.totalTTC;
+
+  const totalHT = parseFloat(String(rawTotalHT)) || computedTotals.ht;
+  const totalTTC = parseFloat(String(rawTotalTTC)) || computedTotals.ttc;
+  const rawTotalTVA = q.taxAmount || q.tvaAmount || q.taxTotal || q.pricingTotals?.totalTVA;
+  const totalTVA = parseFloat(String(rawTotalTVA)) || (totalTTC - totalHT);
   const photos: string[] = q.requestDetails?.mediaUrls || q.photos || q.mediaUrls || [];
   const pdfUrl = q.pdfUrl || q.pdf_url || q.documentUrl;
 
@@ -306,29 +320,21 @@ export default function QuoteDetailScreen() {
         ) : null}
 
         {/* Totaux */}
-        {(totalHT || totalTTC) ? (
-          <View style={[styles.section, { gap: 6 }]}>
-            <Text style={styles.sectionTitle}>Totaux</Text>
-            {totalHT ? (
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Total HT</Text>
-                <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
-              </View>
-            ) : null}
-            {totalTVA ? (
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>TVA</Text>
-                <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
-              </View>
-            ) : null}
-            {totalTTC ? (
-              <View style={[styles.totalRow, styles.totalRowMain]}>
-                <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
-                <Text style={[styles.totalValue, { fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }]}>{fmtEur(totalTTC)}</Text>
-              </View>
-            ) : null}
+        <View style={[styles.section, { gap: 6 }]}>
+          <Text style={styles.sectionTitle}>Totaux</Text>
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total HT</Text>
+            <Text style={styles.totalValue}>{fmtEur(totalHT)}</Text>
           </View>
-        ) : null}
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>TVA</Text>
+            <Text style={styles.totalValue}>{fmtEur(totalTVA)}</Text>
+          </View>
+          <View style={[styles.totalRow, styles.totalRowMain]}>
+            <Text style={[styles.totalLabel, { fontFamily: "Inter_700Bold", color: theme.text }]}>Total TTC</Text>
+            <Text style={[styles.totalValue, { fontFamily: "Inter_700Bold", fontSize: 18, color: theme.primary }]}>{fmtEur(totalTTC)}</Text>
+          </View>
+        </View>
 
         {/* Photos */}
         {photos.length > 0 ? (

@@ -100,9 +100,11 @@ export async function adminApiCall<T = any>(
 ): Promise<T> {
   const { method = "GET", body, headers = {} } = options;
 
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+
   const fetchHeaders: Record<string, string> = {
     Accept: "application/json",
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     "X-Requested-With": "XMLHttpRequest",
     ...headers,
   };
@@ -124,7 +126,7 @@ export async function adminApiCall<T = any>(
   };
 
   if (body) {
-    fetchOptions.body = JSON.stringify(body);
+    fetchOptions.body = isFormData ? body : JSON.stringify(body);
   }
 
   const res = await fetchWithRetry(url, fetchOptions);
