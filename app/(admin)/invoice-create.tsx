@@ -189,12 +189,18 @@ export default function InvoiceCreateScreen() {
       return;
     }
 
-    const mappedItems = validItems.map(it => ({
-      description: it.description.trim(),
-      quantity: parseFloat(it.quantity) || 1,
-      unitPrice: parseFloat(it.unitPrice) || 0,
-      tvaRate: parseFloat(it.tvaRate) || 0,
-    }));
+    const mappedItems = validItems.map(it => {
+      const qty = parseFloat(it.quantity) || 1;
+      const price = parseFloat(it.unitPrice) || 0;
+      const tax = parseFloat(it.tvaRate) || 0;
+      return {
+        description: it.description.trim(),
+        quantity: qty,
+        unitPrice: price.toString(),
+        priceExcludingTax: price.toString(),
+        taxRate: tax.toString(),
+      };
+    });
 
     const dominantTva = validItems.length > 0
       ? (parseFloat(validItems[0].tvaRate) || 20).toString()

@@ -1306,17 +1306,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       const path = req.url.replace(/\?.*$/, "");
       if ((path.replace(/\/$/, "") === "/invoices" || path.replace(/\/$/, "") === "/quotes") && req.method === "POST" && req.body) {
-        const ALLOWED_ITEM_FIELDS = ["description", "quantity", "unitPrice", "tvaRate"];
+        const ALLOWED_ITEM_FIELDS = ["description", "quantity", "unitPrice", "priceExcludingTax", "taxRate", "tvaRate"];
         if (Array.isArray(req.body.items)) {
           req.body.items = req.body.items.map((it: any) => {
             const clean: Record<string, any> = {};
             for (const f of ALLOWED_ITEM_FIELDS) { 
               if (it[f] !== undefined) {
-                if (f === "quantity" || f === "unitPrice" || f === "tvaRate") {
-                  clean[f] = typeof it[f] === "string" ? parseFloat(it[f]) : it[f];
-                } else {
-                  clean[f] = it[f];
-                }
+                clean[f] = f === "quantity" ? (typeof it[f] === "string" ? parseFloat(it[f]) : it[f]) : String(it[f]);
               }
             }
             return clean;
@@ -1327,19 +1323,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const clean: Record<string, any> = {};
             for (const f of ALLOWED_ITEM_FIELDS) {
               if (it[f] !== undefined) {
-                if (f === "quantity" || f === "unitPrice" || f === "tvaRate") {
-                  clean[f] = typeof it[f] === "string" ? parseFloat(it[f]) : it[f];
-                } else {
-                  clean[f] = it[f];
-                }
+                clean[f] = f === "quantity" ? (typeof it[f] === "string" ? parseFloat(it[f]) : it[f]) : String(it[f]);
               }
             }
             return clean;
           });
         }
-        if (typeof req.body.totalHT === "string") req.body.totalHT = parseFloat(req.body.totalHT);
-        if (typeof req.body.totalTTC === "string") req.body.totalTTC = parseFloat(req.body.totalTTC);
-        if (typeof req.body.tvaRate === "string") req.body.tvaRate = parseFloat(req.body.tvaRate);
+        if (typeof req.body.totalHT === "string") req.body.totalHT = req.body.totalHT;
+        if (typeof req.body.totalTTC === "string") req.body.totalTTC = req.body.totalTTC;
         console.log(`[SANITIZE] ${path} Cleaned body:`, JSON.stringify(req.body).substring(0, 500));
       }
 
