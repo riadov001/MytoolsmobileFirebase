@@ -89,64 +89,6 @@ export default function QuoteDetailScreen() {
     },
   });
 
-  const invoiceMutation = useMutation({
-    mutationFn: () => {
-      const quote = q || queryClient.getQueryData<any>(["admin-quote", id]);
-      const ttc = Number(quote?.quoteAmount || quote?.totalTTC || quote?.total || quote?.totalIncludingTax || quote?.amount || quote?.totalAmount || 0);
-      const ht = Number(quote?.priceExcludingTax || quote?.totalHT || quote?.totalExcludingTax || quote?.subtotal || 0);
-      const tva = Number(quote?.taxAmount || quote?.tvaAmount || quote?.taxTotal || 0);
-      const body: any = {
-        amount: ttc,
-        totalAmount: ttc,
-        totalTTC: ttc,
-        total: ttc,
-        totalHT: ht,
-        priceExcludingTax: ht,
-        totalExcludingTax: ht,
-        taxAmount: tva,
-        clientId: quote?.clientId,
-        quoteId: id,
-        items: quote?.items || quote?.lineItems || [],
-        lineItems: quote?.items || quote?.lineItems || [],
-        status: "pending",
-      };
-      return adminQuotes.convertToInvoice(id, body);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quote", id] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showAlert({
-        type: "success",
-        title: "Facture générée",
-        message: "La facture a été créée depuis ce devis avec succès.",
-        buttons: [{ text: "OK", style: "primary" }],
-      });
-    },
-    onError: (err: any) => {
-      showAlert({
-        type: "error",
-        title: "Erreur",
-        message: err?.message || "Impossible de générer la facture.",
-        buttons: [{ text: "OK", style: "primary" }],
-      });
-    },
-  });
-
-  const handleCreateInvoice = () => {
-    showAlert({
-      type: "warning",
-      title: "Créer une facture",
-      message: "Créer une facture depuis ce devis ? Le montant sera prérempli.",
-      buttons: [
-        { text: "Annuler" },
-        { text: "Créer la facture", style: "primary", onPress: () => invoiceMutation.mutate() },
-      ],
-    });
-  };
-
   const handleCreateReservation = () => {
     showAlert({
       type: "warning",
@@ -395,21 +337,11 @@ export default function QuoteDetailScreen() {
         ) : null}
 
 
-        {/* Actions: Facture & RDV */}
+        {/* Actions: RDV */}
         {statusKey !== "cancelled" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
             <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: "#3B82F6", opacity: invoiceMutation.isPending ? 0.6 : 1 }]}
-                onPress={handleCreateInvoice}
-                disabled={invoiceMutation.isPending}
-              >
-                {invoiceMutation.isPending
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="receipt-outline" size={18} color="#fff" />}
-                <Text style={styles.actionBtnText}>Générer facture</Text>
-              </Pressable>
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: "#8B5CF6" }]}
                 onPress={handleCreateReservation}

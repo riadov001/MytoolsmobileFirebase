@@ -1267,8 +1267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const fetchOpts: RequestInit = { method: req.method, headers: authHeaders, redirect: "manual" };
     if (req.method !== "GET" && req.method !== "HEAD") {
       fetchOpts.body = JSON.stringify(req.body);
-      if (urlSuffix.includes("/convert-to-invoice") || urlSuffix.includes("/reservations")) {
-        console.log(`[MOBILE-CRUD-BODY] ${req.method} /${primarySegment}${urlSuffix} body:`, JSON.stringify(req.body).substring(0, 300));
+      if (req.method === "POST") {
+        console.log(`[MOBILE-CRUD-BODY] ${req.method} /${primarySegment}${urlSuffix} body:`, JSON.stringify(req.body).substring(0, 500));
       }
     }
 
