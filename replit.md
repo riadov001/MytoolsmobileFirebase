@@ -264,8 +264,15 @@ Le fichier `.eas/workflows/build-and-submit.yml` déclenche automatiquement (pus
   - Screenshots: JSX mockups of 5 screens (Login, Dashboard, Reservations, Services, Devis) with MyTools logo visible in each
   - Footer: Ultra-compact single line with official MyTools logo, copyright, and essential links (Privacy, Support, PWA Live)
 - Mar 19 2026: **Version 2.0.0 Released**
-  - Removed manual invoice creation screen — invoices only created from quotes
-  - Fixed quote amount calculation with robustness for multiple field name variants
-  - Improved admin CRUD forms (quote/invoice creation via JSON payloads)
   - **Published to Apple App Store**
-  - Android APK build v2.0.0 initiated on EAS
+  - Android APK v2.0.0 built on EAS (account: mytoolslast, project: mytoolsapp)
+  - **Invoice creation simplified**: Removed FAB "Ajouter facture" button and dedicated invoice-create screen — invoices now created only from quotes via "Générer facture" button in quote detail
+  - **Photo mandatory for quotes**: Photo upload required in quote-create form; validation prevents submission without photos
+  - **Quote-to-invoice generation**: New dedicated `POST /api/mobile/quotes/:id/convert-to-invoice` server route with 3-tier fallback:
+    1. Try 3 external convert-to-invoice endpoints (mobile/admin, admin, mobile segments)
+    2. If all fail, fetch quote data and manually create invoice via external invoices endpoint
+    3. If everything fails, return 502 error instead of synthetic success
+  - **Error handling**: Filter "Unexpected" responses from external API using safe string guards; fixed empty POST body issue causing unexpected errors
+  - **Amount computation robustness**: Enhanced fallback logic to search multiple field name variants (unitPrice, price, priceExcludingTax, basePrice, hourlyRate, etc.) when computing totals from items[]
+  - **JSON payloads**: Switched from FormData multipart to JSON payloads for quote/invoice creation; all monetary fields included (totalHT, totalTTC, amount, etc.)
+  - **Data persistence**: All monetary data persists to backend via improved API payload structure
