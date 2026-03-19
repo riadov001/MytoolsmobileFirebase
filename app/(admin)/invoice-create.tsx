@@ -82,8 +82,8 @@ export default function InvoiceCreateScreen() {
   const [clientSearch, setClientSearch] = useState("");
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [notes, setNotes] = useState("");
-  const issueDate = getToday();
-  const dueDate = getDefaultDueDate();
+  const [issueDate] = useState(getToday());
+  const [dueDate] = useState(getDefaultDueDate());
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
