@@ -24,8 +24,12 @@ const TVA_OPTIONS = ["0", "10", "20"];
 
 const PAYMENT_METHODS: { key: string; label: string }[] = [
   { key: "wire_transfer", label: "Virement bancaire" },
-  { key: "credit_card", label: "Carte de crédit" },
+  { key: "card", label: "Carte bancaire" },
   { key: "cash", label: "Espèces" },
+  { key: "sepa", label: "Prélèvement SEPA" },
+  { key: "stripe", label: "Stripe" },
+  { key: "klarna", label: "Klarna" },
+  { key: "alma", label: "Alma" },
 ];
 
 function calcTTC(item: LineItem): number {
@@ -200,26 +204,42 @@ export default function InvoiceCreateScreen() {
       description: notes.trim() || undefined,
       dueDate: dueDate || undefined,
       paymentMethod: paymentMethod || undefined,
-      items: validItems.map(it => ({
-        description: it.description.trim(),
-        quantity: parseFloat(it.quantity) || 1,
-        unitPrice: parseFloat(it.unitPrice) || 0,
-        unitPriceExcludingTax: parseFloat(it.unitPrice) || 0,
-        taxRate: parseFloat(it.tvaRate) || 0,
-        tvaRate: parseFloat(it.tvaRate) || 0,
-        totalPrice: calcTTC(it),
-        totalIncludingTax: calcTTC(it),
-      })),
-      lineItems: validItems.map(it => ({
-        description: it.description.trim(),
-        quantity: parseFloat(it.quantity) || 1,
-        unitPrice: parseFloat(it.unitPrice) || 0,
-        unitPriceExcludingTax: parseFloat(it.unitPrice) || 0,
-        taxRate: parseFloat(it.tvaRate) || 0,
-        tvaRate: parseFloat(it.tvaRate) || 0,
-        totalPrice: calcTTC(it),
-        totalIncludingTax: calcTTC(it),
-      })),
+      items: validItems.map(it => {
+        const qty = parseFloat(it.quantity) || 1;
+        const price = parseFloat(it.unitPrice) || 0;
+        const tax = parseFloat(it.tvaRate) || 0;
+        const totalHT = qty * price;
+        const totalTTCItem = totalHT * (1 + tax / 100);
+        return {
+          description: it.description.trim(),
+          quantity: qty,
+          unitPrice: price,
+          unitPriceExcludingTax: price,
+          taxRate: tax,
+          tvaRate: tax,
+          totalPrice: totalTTCItem,
+          totalIncludingTax: totalTTCItem,
+          totalExcludingTax: totalHT,
+        };
+      }),
+      lineItems: validItems.map(it => {
+        const qty = parseFloat(it.quantity) || 1;
+        const price = parseFloat(it.unitPrice) || 0;
+        const tax = parseFloat(it.tvaRate) || 0;
+        const totalHT = qty * price;
+        const totalTTCItem = totalHT * (1 + tax / 100);
+        return {
+          description: it.description.trim(),
+          quantity: qty,
+          unitPrice: price,
+          unitPriceExcludingTax: price,
+          taxRate: tax,
+          tvaRate: tax,
+          totalPrice: totalTTCItem,
+          totalIncludingTax: totalTTCItem,
+          totalExcludingTax: totalHT,
+        };
+      }),
       totalHT: totalHT.toFixed(2),
       totalTTC: totalTTC.toFixed(2),
       totalAmount: totalTTC.toFixed(2),
