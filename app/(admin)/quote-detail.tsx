@@ -89,6 +89,43 @@ export default function QuoteDetailScreen() {
     },
   });
 
+  const invoiceMutation = useMutation({
+    mutationFn: () => adminQuotes.convertToInvoice(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-quote", id] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showAlert({
+        type: "success",
+        title: "Facture générée",
+        message: "La facture a été créée depuis ce devis avec succès.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    },
+    onError: (err: any) => {
+      showAlert({
+        type: "error",
+        title: "Erreur",
+        message: err?.message || "Impossible de générer la facture.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+    },
+  });
+
+  const handleCreateInvoice = () => {
+    showAlert({
+      type: "warning",
+      title: "Générer une facture",
+      message: "Créer une facture depuis ce devis ?",
+      buttons: [
+        { text: "Annuler" },
+        { text: "Générer", style: "primary", onPress: () => invoiceMutation.mutate() },
+      ],
+    });
+  };
+
   const handleCreateReservation = () => {
     showAlert({
       type: "warning",
@@ -337,11 +374,21 @@ export default function QuoteDetailScreen() {
         ) : null}
 
 
-        {/* Actions: RDV */}
+        {/* Actions: Facture & RDV */}
         {statusKey !== "cancelled" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
             <View style={styles.actionRow}>
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: "#3B82F6", opacity: invoiceMutation.isPending ? 0.6 : 1 }]}
+                onPress={handleCreateInvoice}
+                disabled={invoiceMutation.isPending}
+              >
+                {invoiceMutation.isPending
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="receipt-outline" size={18} color="#fff" />}
+                <Text style={styles.actionBtnText}>Générer facture</Text>
+              </Pressable>
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: "#8B5CF6" }]}
                 onPress={handleCreateReservation}
