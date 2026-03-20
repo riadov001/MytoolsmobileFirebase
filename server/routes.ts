@@ -1239,19 +1239,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return { status: r.status, text: txt, headers: r.headers };
       };
 
+      const isMutation = !["GET", "HEAD"].includes(req.method);
+      const adminUrl = `${EXTERNAL_API}/admin${req.url}`;
       const mobileUrl = `${EXTERNAL_API}/mobile/admin${req.url}`;
-      let result = await tryUrl(mobileUrl);
 
-      if (!result) {
-        const legacyUrl = `${EXTERNAL_API}/admin${req.url}`;
-        result = await tryUrl(legacyUrl);
-        if (result) console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${result.status} (legacy fallback)`);
+      let result: Awaited<ReturnType<typeof tryUrl>> = null;
+
+      if (isMutation) {
+        // Pour les créations/modifications, essayer d'abord /admin/ (routes standard)
+        result = await tryUrl(adminUrl);
+        if (result && result.status < 500) {
+          console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${result.status}`);
+        } else {
+          // Fallback vers /mobile/admin/ si /admin/ échoue
+          const mobileResult = await tryUrl(mobileUrl);
+          if (mobileResult && (result === null || mobileResult.status < (result?.status ?? 999))) {
+            result = mobileResult;
+            console.log(`[MOBILE-ADMIN] ${req.method} /mobile/admin${req.url} => ${result.status} (mobile fallback)`);
+          } else if (result) {
+            console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${result.status} (kept admin result)`);
+          }
+        }
       } else {
-        console.log(`[MOBILE-ADMIN] ${req.method} /mobile/admin${req.url} => ${result.status}`);
+        // Pour les lectures, essayer d'abord /mobile/admin/ puis /admin/
+        result = await tryUrl(mobileUrl);
+        if (!result) {
+          result = await tryUrl(adminUrl);
+          if (result) console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${result.status} (legacy fallback)`);
+        } else {
+          console.log(`[MOBILE-ADMIN] ${req.method} /mobile/admin${req.url} => ${result.status}`);
+        }
       }
 
       if (!result) {
-        const isMutation = !["GET","HEAD"].includes(req.method);
         return res.status(404).json({ success: false, message: isMutation ? "Cette fonctionnalité n'est pas disponible sur ce serveur." : "Endpoint non trouvé" });
       }
 

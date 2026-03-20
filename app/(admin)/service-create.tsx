@@ -49,10 +49,14 @@ export default function ServiceCreateScreen() {
   const mutation = useMutation({
     mutationFn: () => {
       if (!name.trim()) throw new Error("Le nom du service est obligatoire.");
+      const priceVal = basePrice ? parseFloat(basePrice.replace(",", ".")).toFixed(2) : "0.00";
       const payload: any = {
         name: name.trim(),
         description: description.trim(),
-        basePrice: basePrice ? parseFloat(basePrice.replace(",", ".")).toFixed(2) : "0.00",
+        basePrice: priceVal,
+        price: priceVal,
+        unit_price: priceVal,
+        priceExcludingTax: priceVal,
         duration,
         category: category || "Autre",
       };
