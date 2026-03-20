@@ -1525,44 +1525,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { id } = req.params;
     console.log(`[CONVERT-INVOICE] Converting quote ${id} to invoice`);
     
-    try {
-      const authHeaders: Record<string, string> = {
-        "host": new URL(EXTERNAL_API).host,
-        "accept": "application/json",
-        "content-type": "application/json",
-        "x-requested-with": "XMLHttpRequest",
-      };
-      if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"] as string;
-      if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"] as string;
+    const authHeaders: Record<string, string> = {
+      "host": new URL(EXTERNAL_API).host,
+      "accept": "application/json",
+      "content-type": "application/json",
+      "x-requested-with": "XMLHttpRequest",
+    };
+    if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"] as string;
+    if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"] as string;
 
-      const tryUrl = async (url: string) => {
-        try {
-          const r = await fetch(url, { method: "POST", headers: authHeaders, redirect: "manual" });
-          const txt = await r.text();
-          if (txt.includes("<!DOCTYPE") || txt.includes("<html")) {
-            console.log(`[CONVERT-INVOICE] ${url} => HTML (auth failed)`);
-            return null;
-          }
-          const parsed = JSON.parse(txt);
-          if (r.ok && parsed?.id) {
-            console.log(`[CONVERT-INVOICE] ✅ ${url} => Success`);
-            return parsed;
-          }
-        } catch (e) {
-          console.log(`[CONVERT-INVOICE] ${url} => ${(e as any).message}`);
+    const tryUrl = async (url: string) => {
+      try {
+        const r = await fetch(url, { method: "POST", headers: authHeaders, redirect: "manual" });
+        const txt = await r.text();
+        if (txt.includes("<!DOCTYPE") || txt.includes("<html")) {
+          console.log(`[CONVERT-INVOICE] ${url} => HTML (auth failed)`);
+          return null;
         }
-        return null;
-      };
-
-      for (const url of [
-        `${EXTERNAL_API}/mobile/admin/quotes/${id}/convert-to-invoice`,
-        `${EXTERNAL_API}/admin/quotes/${id}/convert-to-invoice`,
-      ]) {
-        const result = await tryUrl(url);
-        if (result) return res.status(201).json(result);
+        const parsed = JSON.parse(txt);
+        if (r.ok && parsed?.id) {
+          console.log(`[CONVERT-INVOICE] ✅ ${url} => Success`);
+          return parsed;
+        }
+      } catch (e) {
+        console.log(`[CONVERT-INVOICE] ${url} => ${(e as any).message}`);
       }
+      return null;
+    };
 
-      console.log(`[CONVERT-INVOICE] API failed, creating invoice locally from quote data`);
+    for (const url of [
+      `${EXTERNAL_API}/mobile/admin/quotes/${id}/convert-to-invoice`,
+      `${EXTERNAL_API}/admin/quotes/${id}/convert-to-invoice`,
+    ]) {
+      const result = await tryUrl(url);
+      if (result) return res.status(201).json(result);
+    }
+
+    console.log(`[CONVERT-INVOICE] API failed, creating invoice locally from quote data`);
 
     try {
       const quoteSegments = ["mobile/admin/quotes", "admin/quotes", "mobile/quotes"];
