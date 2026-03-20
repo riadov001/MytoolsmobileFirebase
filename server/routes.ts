@@ -1169,6 +1169,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "quantity": "quantity",
           "description": "description",
         };
+        // Map root-level amount fields
+        const rootAmountMap: Record<string, string> = {
+          "totalHT": "total_excluding_tax",
+          "totalTTC": "total",
+          "totalAmount": "total",
+          "amount": "total",
+          "tvaRate": "tax_rate",
+          "priceExcludingTax": "total_excluding_tax",
+        };
+        
+        for (const [src, dst] of Object.entries(rootAmountMap)) {
+          if (req.body[src] !== undefined && !req.body[dst]) {
+            req.body[dst] = req.body[src];
+          }
+        }
+        
         if (Array.isArray(req.body.items)) {
           req.body.items = req.body.items.map((it: any) => {
             const clean: Record<string, any> = {};
@@ -1207,10 +1223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return clean;
           });
         }
-        if (path.replace(/\/$/, "") === "/quotes" && !req.body.serviceId) {
-          req.body.serviceId = "demo-s1";
-        }
-        console.log(`[SANITIZE] ${path} Cleaned body:`, JSON.stringify(req.body).substring(0, 500));
+        console.log(`[SANITIZE] ${path} Mapped totals - HT: ${req.body.total_excluding_tax}, TTC: ${req.body.total}`);
       }
 
       const { body, contentType } = buildBody();
