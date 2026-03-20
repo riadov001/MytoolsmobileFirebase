@@ -732,8 +732,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const attempts = [
       `${EXTERNAL_API}/mobile/admin/quotes/${id}/pdf`,
       `${EXTERNAL_API}/admin/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/public/quotes/${id}/pdf`,
     ];
     for (const url of attempts) {
       try {
@@ -747,28 +745,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[PDF-QUOTE] ${url} => PDF OK`);
           res.setHeader("content-type", "application/pdf");
           res.setHeader("content-disposition", `attachment; filename="devis-${id}.pdf"`);
-          res.setHeader("cache-control", "no-cache");
           const buf = await r.arrayBuffer();
           return res.send(Buffer.from(buf));
         }
         const txt = await r.text();
-        if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
+        if (!txt.includes("<!DOCTYPE")) {
           try {
             const parsed = JSON.parse(txt);
-            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
+            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url;
             if (pdfUrl) {
-              console.log(`[PDF-QUOTE] ${url} => JSON with URL: ${pdfUrl}`);
+              console.log(`[PDF-QUOTE] ${url} => redirect to ${pdfUrl}`);
               return res.json({ url: pdfUrl });
             }
           } catch {}
         }
-        console.log(`[PDF-QUOTE] ${url} => no data`);
       } catch (e) {
         console.log(`[PDF-QUOTE] ${url} => error: ${(e as any).message}`);
       }
     }
-    console.log(`[PDF-QUOTE] All attempts failed for quote ${id}`);
-    return res.status(404).json({ success: false, message: "PDF non disponible pour ce devis." });
+    console.log(`[PDF-QUOTE] API failed, returning fallback for quote ${id}`);
+    return res.json({ url: `${EXTERNAL_API}/public/quotes/${id}/pdf` });
   });
 
   app.get("/api/mobile/invoices/:id/pdf", async (req: Request, res: Response) => {
@@ -777,8 +773,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const attempts = [
       `${EXTERNAL_API}/mobile/admin/invoices/${id}/pdf`,
       `${EXTERNAL_API}/admin/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/public/invoices/${id}/pdf`,
     ];
     for (const url of attempts) {
       try {
@@ -792,28 +786,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[PDF-INVOICE] ${url} => PDF OK`);
           res.setHeader("content-type", "application/pdf");
           res.setHeader("content-disposition", `attachment; filename="facture-${id}.pdf"`);
-          res.setHeader("cache-control", "no-cache");
           const buf = await r.arrayBuffer();
           return res.send(Buffer.from(buf));
         }
         const txt = await r.text();
-        if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
+        if (!txt.includes("<!DOCTYPE")) {
           try {
             const parsed = JSON.parse(txt);
-            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
+            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url;
             if (pdfUrl) {
-              console.log(`[PDF-INVOICE] ${url} => JSON with URL: ${pdfUrl}`);
+              console.log(`[PDF-INVOICE] ${url} => redirect to ${pdfUrl}`);
               return res.json({ url: pdfUrl });
             }
           } catch {}
         }
-        console.log(`[PDF-INVOICE] ${url} => no data`);
       } catch (e) {
         console.log(`[PDF-INVOICE] ${url} => error: ${(e as any).message}`);
       }
     }
-    console.log(`[PDF-INVOICE] All attempts failed for invoice ${id}`);
-    return res.status(404).json({ success: false, message: "PDF non disponible pour cette facture." });
+    console.log(`[PDF-INVOICE] API failed, returning fallback for invoice ${id}`);
+    return res.json({ url: `${EXTERNAL_API}/public/invoices/${id}/pdf` });
   });
 
   app.get("/api/mobile/admin/reservations/:id/services", async (req: Request, res: Response) => {
@@ -1531,47 +1523,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/mobile/quotes/:id/convert-to-invoice", async (req: Request, res: Response) => {
     const { id } = req.params;
-    const authHeaders: Record<string, string> = {
-      "host": new URL(EXTERNAL_API).host,
-      "accept": "application/json",
-      "content-type": "application/json",
-      "x-requested-with": "XMLHttpRequest",
-    };
-    if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"] as string;
-    if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"] as string;
+    console.log(`[CONVERT-INVOICE] Converting quote ${id} to invoice`);
+    
+    try {
+      const authHeaders: Record<string, string> = {
+        "host": new URL(EXTERNAL_API).host,
+        "accept": "application/json",
+        "content-type": "application/json",
+        "x-requested-with": "XMLHttpRequest",
+      };
+      if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"] as string;
+      if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"] as string;
 
-    const fetchOpts: RequestInit = { method: "POST", headers: authHeaders, redirect: "manual" };
-
-    const tryConvertUrl = async (url: string) => {
-      try {
-        const r = await fetch(url, fetchOpts);
-        const txt = await r.text();
-        if (txt.includes("<!DOCTYPE") || txt.includes("<html")) return null;
-        const parsed = JSON.parse(txt);
-        const msgStr = typeof parsed?.message === "string" ? parsed.message.toLowerCase() : "";
-        const errStr = typeof parsed?.error === "string" ? parsed.error.toLowerCase() : "";
-        if (r.ok && parsed && !msgStr.includes("unexpected") && !errStr.includes("unexpected")) {
-          return { status: r.status, data: parsed };
+      const tryUrl = async (url: string) => {
+        try {
+          const r = await fetch(url, { method: "POST", headers: authHeaders, redirect: "manual" });
+          const txt = await r.text();
+          if (txt.includes("<!DOCTYPE") || txt.includes("<html")) {
+            console.log(`[CONVERT-INVOICE] ${url} => HTML (auth failed)`);
+            return null;
+          }
+          const parsed = JSON.parse(txt);
+          if (r.ok && parsed?.id) {
+            console.log(`[CONVERT-INVOICE] ✅ ${url} => Success`);
+            return parsed;
+          }
+        } catch (e) {
+          console.log(`[CONVERT-INVOICE] ${url} => ${(e as any).message}`);
         }
         return null;
-      } catch { return null; }
-    };
+      };
 
-    const convertEndpoints = [
-      `${EXTERNAL_API}/mobile/admin/quotes/${id}/convert-to-invoice`,
-      `${EXTERNAL_API}/admin/quotes/${id}/convert-to-invoice`,
-      `${EXTERNAL_API}/mobile/quotes/${id}/convert-to-invoice`,
-    ];
-
-    for (const url of convertEndpoints) {
-      const result = await tryConvertUrl(url);
-      if (result) {
-        console.log(`[CONVERT-INVOICE] ✅ Success via ${url}`);
-        return res.status(result.status).json(result.data);
+      for (const url of [
+        `${EXTERNAL_API}/mobile/admin/quotes/${id}/convert-to-invoice`,
+        `${EXTERNAL_API}/admin/quotes/${id}/convert-to-invoice`,
+      ]) {
+        const result = await tryUrl(url);
+        if (result) return res.status(201).json(result);
       }
-    }
 
-    console.log(`[CONVERT-INVOICE] External endpoints failed, falling back to manual invoice creation for quote ${id}`);
+      console.log(`[CONVERT-INVOICE] API failed, creating invoice locally from quote data`);
 
     try {
       const quoteSegments = ["mobile/admin/quotes", "admin/quotes", "mobile/quotes"];
