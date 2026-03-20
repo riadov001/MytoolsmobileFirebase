@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, ActivityIndicator, Alert, FlatList,
 } from "react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -49,6 +49,10 @@ function fmtEur(n: number): string {
 }
 
 export default function QuoteCreateScreen() {
+  const params = useLocalSearchParams();
+  const editId = Array.isArray(params.editId) ? params.editId[0] : (params.editId as string || "");
+  const isEditMode = !!editId;
+
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
@@ -68,6 +72,35 @@ export default function QuoteCreateScreen() {
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: "", quantity: "1", unitPrice: "", tvaRate: "20" },
   ]);
+  const [editLoaded, setEditLoaded] = useState(false);
+
+  const { data: editQuote } = useQuery({
+    queryKey: ["admin-quote", editId],
+    queryFn: () => adminQuotes.getById(editId),
+    enabled: isEditMode && !editLoaded,
+  });
+
+  useEffect(() => {
+    if (!isEditMode || editLoaded || !editQuote) return;
+    if (editQuote.clientId) setSelectedClientId(String(editQuote.clientId));
+    if (editQuote.notes) setNotes(editQuote.notes);
+    if (editQuote.description) setNotes(editQuote.description);
+    if (editQuote.vehicleInfo) {
+      setVehicleBrand(editQuote.vehicleInfo.brand || "");
+      setVehicleModel(editQuote.vehicleInfo.model || "");
+      setVehiclePlate(editQuote.vehicleInfo.plate || "");
+    }
+    const existingItems: any[] = editQuote.items || editQuote.lineItems || editQuote.lines || editQuote.quote_items || [];
+    if (existingItems.length > 0) {
+      setLineItems(existingItems.map((it: any) => ({
+        description: it.description || it.name || "",
+        quantity: String(it.quantity ?? 1),
+        unitPrice: String(it.unit_price_excluding_tax ?? it.unitPriceExcludingTax ?? it.unitPrice ?? it.unit_price ?? it.price ?? 0),
+        tvaRate: String(it.tax_rate ?? it.taxRate ?? it.tvaRate ?? 20),
+      })));
+    }
+    setEditLoaded(true);
+  }, [editQuote, isEditMode, editLoaded]);
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery({
     queryKey: ["admin-clients"],
@@ -104,7 +137,33 @@ export default function QuoteCreateScreen() {
       validItems: Array<{ description: string; quantity: string; unitPrice: string; tvaRate: string }>;
       photos: Array<{ uri: string; name: string }>;
     }) => {
-      // Étape 1 : Créer le devis (sans items)
+      if (isEditMode) {
+        const updateBody: any = {
+          clientId: payload.clientId,
+          notes: payload.notes || null,
+        };
+        if (payload.vehicleInfo) updateBody.vehicleInfo = payload.vehicleInfo;
+        const items = payload.validItems.map(it => {
+          const qty = parseFloat(it.quantity) || 1;
+          const price = parseFloat(it.unitPrice) || 0;
+          const tva = parseFloat(it.tvaRate) || 0;
+          const totalHT = qty * price;
+          const taxAmount = totalHT * (tva / 100);
+          const totalTTC = totalHT + taxAmount;
+          return {
+            description: it.description.trim(),
+            quantity: String(qty),
+            unitPriceExcludingTax: price.toFixed(2),
+            totalExcludingTax: totalHT.toFixed(2),
+            taxRate: String(tva),
+            taxAmount: taxAmount.toFixed(2),
+            totalIncludingTax: totalTTC.toFixed(2),
+          };
+        });
+        updateBody.items = items;
+        return await adminQuotes.update(editId, updateBody);
+      }
+
       const quoteBody: any = {
         clientId: payload.clientId,
         serviceId: payload.serviceId,
@@ -116,7 +175,6 @@ export default function QuoteCreateScreen() {
       const quote = await adminQuotes.create(quoteBody);
       if (!quote?.id) throw new Error("Échec de la création du devis.");
 
-      // Étape 2 : Ajouter les articles un par un
       for (const it of payload.validItems) {
         const qty = parseFloat(it.quantity) || 1;
         const price = parseFloat(it.unitPrice) || 0;
@@ -135,7 +193,6 @@ export default function QuoteCreateScreen() {
         });
       }
 
-      // Étape 3 : Uploader les photos si présentes
       if (payload.photos.length > 0) {
         const mediaForm = new FormData();
         payload.photos.forEach((photo, idx) => {
@@ -147,21 +204,20 @@ export default function QuoteCreateScreen() {
         });
         try {
           await adminQuotes.addMedia(quote.id, mediaForm);
-        } catch {
-          // Erreur photo non bloquante
-        }
+        } catch {}
       }
 
       return quote;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-quotes"] });
+      if (isEditMode) queryClient.invalidateQueries({ queryKey: ["admin-quote", editId] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     },
     onError: (err: any) => {
-      Alert.alert("Erreur", err?.message || "Impossible de créer le devis.");
+      Alert.alert("Erreur", err?.message || isEditMode ? "Impossible de modifier le devis." : "Impossible de créer le devis.");
     },
   });
 
@@ -260,7 +316,7 @@ export default function QuoteCreateScreen() {
       Alert.alert("Attention", "Veuillez sélectionner un client.");
       return;
     }
-    if (selectedServices.length === 0) {
+    if (!isEditMode && selectedServices.length === 0) {
       Alert.alert("Attention", "Veuillez sélectionner au moins un service.");
       return;
     }
@@ -298,7 +354,7 @@ export default function QuoteCreateScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="close" size={22} color={theme.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Nouveau devis</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? "Modifier le devis" : "Nouveau devis"}</Text>
         <Pressable
           style={[styles.submitBtn, createMutation.isPending && { opacity: 0.6 }]}
           onPress={handleSubmit}
@@ -306,7 +362,7 @@ export default function QuoteCreateScreen() {
         >
           {createMutation.isPending
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.submitText}>Créer</Text>}
+            : <Text style={styles.submitText}>{isEditMode ? "Enregistrer" : "Créer"}</Text>}
         </Pressable>
       </View>
 

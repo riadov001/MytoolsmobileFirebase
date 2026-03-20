@@ -263,6 +263,20 @@ export default function InvoiceDetailScreen() {
           </View>
         ) : null}
 
+        {/* Edit Action */}
+        {statusKey !== "paid" && statusKey !== "cancelled" ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Actions</Text>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: theme.primary }]}
+              onPress={() => router.push({ pathname: "/(admin)/invoice-create", params: { editId: id } } as any)}
+            >
+              <Ionicons name="create-outline" size={18} color="#fff" />
+              <Text style={[styles.actionBtnText, { color: "#fff" }]}>Modifier la facture</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* Status Actions */}
         {statusKey !== "paid" && (
           <View style={[styles.section, { gap: 8 }]}>

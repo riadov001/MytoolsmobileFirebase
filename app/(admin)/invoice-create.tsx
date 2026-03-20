@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, Alert,
   TextInput, ActivityIndicator, FlatList,
@@ -63,6 +63,8 @@ function fmtEur(n: number): string {
 export default function InvoiceCreateScreen() {
   const params = useLocalSearchParams();
   const paramClientId = Array.isArray(params.clientId) ? params.clientId[0] : (params.clientId as string || "");
+  const editId = Array.isArray(params.editId) ? params.editId[0] : (params.editId as string || "");
+  const isEditMode = !!editId;
 
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -79,6 +81,31 @@ export default function InvoiceCreateScreen() {
   const [lineItems, setLineItems] = useState<LineItem[]>([]);
   const [photos, setPhotos] = useState<{ uri: string; name: string }[]>([]);
   const [showOCRModal, setShowOCRModal] = useState(false);
+  const [editLoaded, setEditLoaded] = useState(false);
+
+  const { data: editInvoice } = useQuery({
+    queryKey: ["admin-invoice", editId],
+    queryFn: () => adminInvoices.getById(editId),
+    enabled: isEditMode && !editLoaded,
+  });
+
+  useEffect(() => {
+    if (!isEditMode || editLoaded || !editInvoice) return;
+    if (editInvoice.clientId) setSelectedClientId(String(editInvoice.clientId));
+    if (editInvoice.notes) setNotes(editInvoice.notes);
+    if (editInvoice.description) setNotes(editInvoice.description);
+    if (editInvoice.paymentMethod) setPaymentMethod(editInvoice.paymentMethod);
+    const existingItems: any[] = editInvoice.items || editInvoice.lineItems || editInvoice.lines || editInvoice.invoice_lines || [];
+    if (existingItems.length > 0) {
+      setLineItems(existingItems.map((it: any) => ({
+        description: it.description || it.name || "",
+        quantity: String(it.quantity ?? 1),
+        unitPrice: String(it.unit_price_excluding_tax ?? it.unitPriceExcludingTax ?? it.unitPrice ?? it.unit_price ?? it.price ?? 0),
+        tvaRate: String(it.tax_rate ?? it.taxRate ?? it.tvaRate ?? 20),
+      })));
+    }
+    setEditLoaded(true);
+  }, [editInvoice, isEditMode, editLoaded]);
 
   const { data: services = [] } = useQuery({
     queryKey: ["admin-services"],
@@ -115,7 +142,28 @@ export default function InvoiceCreateScreen() {
 
   const createMutation = useMutation({
     mutationFn: async (payload: any) => {
-      console.log("[INVOICE-CREATE-2STEP] Creating invoice shell...");
+      if (isEditMode) {
+        const validItems = JSON.parse(payload.items || "[]");
+        const items = validItems.map((item: any) => ({
+          description: item.description,
+          quantity: String(item.quantity),
+          unitPriceExcludingTax: item.unit_price_excluding_tax,
+          totalExcludingTax: String(parseFloat(item.unit_price_excluding_tax) * item.quantity),
+          taxRate: item.tax_rate,
+          taxAmount: String(parseFloat(item.unit_price_excluding_tax) * item.quantity * (parseFloat(item.tax_rate) / 100)),
+          totalIncludingTax: String(parseFloat(item.unit_price_excluding_tax) * item.quantity * (1 + parseFloat(item.tax_rate) / 100)),
+        }));
+        return await adminInvoices.update(editId, {
+          clientId: payload.clientId,
+          total_excluding_tax: payload.total_excluding_tax,
+          total_including_tax: payload.total_including_tax,
+          amount: payload.amount,
+          notes: payload.notes,
+          paymentMethod: payload.paymentMethod,
+          items,
+        });
+      }
+
       const invoiceShell = await adminInvoices.create({
         clientId: payload.clientId,
         status: payload.status,
@@ -132,7 +180,6 @@ export default function InvoiceCreateScreen() {
       
       const validItems = JSON.parse(payload.items || "[]");
       for (const item of validItems) {
-        console.log("[INVOICE-CREATE-2STEP] Adding item:", item.description);
         await adminInvoices.addItem(invoiceShell.id, {
           description: item.description,
           quantity: String(item.quantity),
@@ -148,12 +195,13 @@ export default function InvoiceCreateScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
+      if (isEditMode) queryClient.invalidateQueries({ queryKey: ["admin-invoice", editId] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showAlert({
         type: "success",
-        title: "Facture créée",
-        message: "La facture a été créée avec succès.",
+        title: isEditMode ? "Facture modifiée" : "Facture créée",
+        message: isEditMode ? "La facture a été modifiée avec succès." : "La facture a été créée avec succès.",
         buttons: [{ text: "OK", style: "primary", onPress: () => router.back() }],
       });
     },
@@ -161,7 +209,7 @@ export default function InvoiceCreateScreen() {
       showAlert({
         type: "error",
         title: "Erreur",
-        message: err?.message || "Impossible de créer la facture.",
+        message: err?.message || (isEditMode ? "Impossible de modifier la facture." : "Impossible de créer la facture."),
         buttons: [{ text: "OK", style: "primary" }],
       });
     },
@@ -233,7 +281,7 @@ export default function InvoiceCreateScreen() {
       return;
     }
 
-    if (photos.length === 0) {
+    if (!isEditMode && photos.length === 0) {
       showAlert({ type: "warning", title: "Attention", message: "Au moins une photo est obligatoire.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
@@ -317,7 +365,7 @@ export default function InvoiceCreateScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="close" size={22} color={theme.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Nouvelle facture</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? "Modifier la facture" : "Nouvelle facture"}</Text>
         <Pressable
           style={[styles.submitHeaderBtn, createMutation.isPending && { opacity: 0.6 }]}
           onPress={handleSubmit}
@@ -325,7 +373,7 @@ export default function InvoiceCreateScreen() {
         >
           {createMutation.isPending
             ? <ActivityIndicator size="small" color="#fff" />
-            : <Text style={styles.submitHeaderText}>Créer</Text>}
+            : <Text style={styles.submitHeaderText}>{isEditMode ? "Enregistrer" : "Créer"}</Text>}
         </Pressable>
       </View>
 

@@ -400,6 +400,15 @@ export default function QuoteDetailScreen() {
         {statusKey !== "cancelled" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
+            {statusKey !== "converted" && statusKey !== "completed" && statusKey !== "paid" ? (
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: theme.primary, marginBottom: 8 }]}
+                onPress={() => router.push({ pathname: "/(admin)/quote-create", params: { editId: id } } as any)}
+              >
+                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Text style={styles.actionBtnText}>Modifier le devis</Text>
+              </Pressable>
+            ) : null}
             {statusKey !== "converted" ? (
               <Pressable
                 style={[styles.actionBtn, { backgroundColor: "#2563EB", marginBottom: 8, opacity: convertMutation.isPending ? 0.6 : 1 }]}
