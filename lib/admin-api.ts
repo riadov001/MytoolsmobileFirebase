@@ -20,7 +20,7 @@ const getApiBase = () => {
   if (process.env.EXPO_PUBLIC_DOMAIN) {
     return `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
   }
-  return "https://my-tools-pwa-v-322-pafinv.replit.app";
+  return "https://saas3.mytoolsgroup.eu";
 };
 
 const API_BASE = getApiBase();

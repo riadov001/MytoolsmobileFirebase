@@ -2,7 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "node:http";
 import pg from "pg";
 
-const EXTERNAL_API = "https://my-tools-pwa-v-322-pafinv.replit.app/api";
+const EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
 console.log(`[CONFIG] External API: ${EXTERNAL_API}`);
 
 const pool = new pg.Pool({
