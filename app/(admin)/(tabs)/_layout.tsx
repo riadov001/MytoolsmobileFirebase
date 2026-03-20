@@ -13,16 +13,30 @@ function CreateModal({ visible, onClose }: { visible: boolean; onClose: () => vo
 
   const options = [
     {
+      icon: "document-text-outline" as const,
+      label: "Nouveau devis",
+      sub: "Créer un devis",
+      color: "#8B5CF6",
+      route: "/(admin)/quote-create",
+    },
+    {
       icon: "receipt-outline" as const,
       label: "Nouvelle facture",
-      sub: "Créer une facture client",
+      sub: "Créer une facture",
       color: "#3B82F6",
       route: "/(admin)/invoice-create",
     },
     {
+      icon: "person-add-outline" as const,
+      label: "Nouveau client",
+      sub: "Ajouter un client",
+      color: "#10B981",
+      route: "/(admin)/client-form",
+    },
+    {
       icon: "calendar-outline" as const,
-      label: "Nouveau rendez-vous",
-      sub: "Planifier un RDV",
+      label: "Nouveau RDV",
+      sub: "Planifier un rendez-vous",
       color: "#22C55E",
       route: "/(admin)/reservation-create",
     },
@@ -59,7 +73,7 @@ function CreateModal({ visible, onClose }: { visible: boolean; onClose: () => vo
               }}
             >
               <View style={[styles.optionIcon, { backgroundColor: opt.color + "22" }]}>
-                <Ionicons name={opt.icon} size={26} color={opt.color} />
+                <Ionicons name={opt.icon} size={22} color={opt.color} />
               </View>
               <View style={styles.optionText}>
                 <Text style={styles.optionLabel}>{opt.label}</Text>
@@ -218,40 +232,40 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   sheetTitle: {
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: "#fff",
-    marginBottom: 18,
+    marginBottom: 14,
   },
   sheetOptions: {
-    gap: 10,
+    gap: 8,
     marginBottom: 8,
   },
   optionRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 14,
+    gap: 12,
     backgroundColor: "#2C2C2E",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 14,
+    padding: 12,
   },
   optionIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
   },
   optionText: { flex: 1 },
   optionLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
     color: "#fff",
   },
   optionSub: {
-    fontSize: 13,
+    fontSize: 11,
     fontFamily: "Inter_400Regular",
     color: "#9CA3AF",
-    marginTop: 3,
+    marginTop: 2,
   },
 });
