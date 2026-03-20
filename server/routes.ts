@@ -730,19 +730,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const { id } = req.params;
     const authHeaders = getAuthHeaders(req);
     const attempts = [
-      `${EXTERNAL_API}/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/admin/quotes/${id}/pdf`,
       `${EXTERNAL_API}/mobile/admin/quotes/${id}/pdf`,
+      `${EXTERNAL_API}/admin/quotes/${id}/pdf`,
+      `${EXTERNAL_API}/quotes/${id}/pdf`,
       `${EXTERNAL_API}/public/quotes/${id}/pdf`,
     ];
     for (const url of attempts) {
       try {
         const r = await fetch(url, { headers: { ...authHeaders, "accept": "application/pdf,application/json,*/*" }, redirect: "follow" });
-        if (!r.ok) continue;
+        if (!r.ok) {
+          console.log(`[PDF-QUOTE] ${url} => ${r.status}`);
+          continue;
+        }
         const ct = r.headers.get("content-type") || "";
         if (ct.includes("pdf")) {
+          console.log(`[PDF-QUOTE] ${url} => PDF OK`);
           res.setHeader("content-type", "application/pdf");
-          res.setHeader("content-disposition", `inline; filename="devis-${id}.pdf"`);
+          res.setHeader("content-disposition", `attachment; filename="devis-${id}.pdf"`);
+          res.setHeader("cache-control", "no-cache");
           const buf = await r.arrayBuffer();
           return res.send(Buffer.from(buf));
         }
@@ -751,31 +756,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const parsed = JSON.parse(txt);
             const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
-            if (pdfUrl) return res.json({ url: pdfUrl });
+            if (pdfUrl) {
+              console.log(`[PDF-QUOTE] ${url} => JSON with URL: ${pdfUrl}`);
+              return res.json({ url: pdfUrl });
+            }
           } catch {}
         }
-      } catch {}
+        console.log(`[PDF-QUOTE] ${url} => no data`);
+      } catch (e) {
+        console.log(`[PDF-QUOTE] ${url} => error: ${(e as any).message}`);
+      }
     }
-    return res.status(404).json({ message: "PDF non disponible pour ce devis." });
+    console.log(`[PDF-QUOTE] All attempts failed for quote ${id}`);
+    return res.status(404).json({ success: false, message: "PDF non disponible pour ce devis." });
   });
 
   app.get("/api/mobile/invoices/:id/pdf", async (req: Request, res: Response) => {
     const { id } = req.params;
     const authHeaders = getAuthHeaders(req);
     const attempts = [
-      `${EXTERNAL_API}/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/admin/invoices/${id}/pdf`,
       `${EXTERNAL_API}/mobile/admin/invoices/${id}/pdf`,
+      `${EXTERNAL_API}/admin/invoices/${id}/pdf`,
+      `${EXTERNAL_API}/invoices/${id}/pdf`,
       `${EXTERNAL_API}/public/invoices/${id}/pdf`,
     ];
     for (const url of attempts) {
       try {
         const r = await fetch(url, { headers: { ...authHeaders, "accept": "application/pdf,application/json,*/*" }, redirect: "follow" });
-        if (!r.ok) continue;
+        if (!r.ok) {
+          console.log(`[PDF-INVOICE] ${url} => ${r.status}`);
+          continue;
+        }
         const ct = r.headers.get("content-type") || "";
         if (ct.includes("pdf")) {
+          console.log(`[PDF-INVOICE] ${url} => PDF OK`);
           res.setHeader("content-type", "application/pdf");
-          res.setHeader("content-disposition", `inline; filename="facture-${id}.pdf"`);
+          res.setHeader("content-disposition", `attachment; filename="facture-${id}.pdf"`);
+          res.setHeader("cache-control", "no-cache");
           const buf = await r.arrayBuffer();
           return res.send(Buffer.from(buf));
         }
@@ -784,12 +801,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           try {
             const parsed = JSON.parse(txt);
             const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
-            if (pdfUrl) return res.json({ url: pdfUrl });
+            if (pdfUrl) {
+              console.log(`[PDF-INVOICE] ${url} => JSON with URL: ${pdfUrl}`);
+              return res.json({ url: pdfUrl });
+            }
           } catch {}
         }
-      } catch {}
+        console.log(`[PDF-INVOICE] ${url} => no data`);
+      } catch (e) {
+        console.log(`[PDF-INVOICE] ${url} => error: ${(e as any).message}`);
+      }
     }
-    return res.status(404).json({ message: "PDF non disponible pour cette facture." });
+    console.log(`[PDF-INVOICE] All attempts failed for invoice ${id}`);
+    return res.status(404).json({ success: false, message: "PDF non disponible pour cette facture." });
   });
 
   app.get("/api/mobile/admin/reservations/:id/services", async (req: Request, res: Response) => {
