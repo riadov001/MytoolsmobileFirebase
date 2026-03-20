@@ -57,6 +57,8 @@ async function initDatabase() {
   }
 }
 
+let capturedRealToken: string | null = null;
+
 function getAuthHeaders(req: Request): Record<string, string> {
   const headers: Record<string, string> = {
     "host": new URL(EXTERNAL_API).host,
@@ -65,7 +67,13 @@ function getAuthHeaders(req: Request): Record<string, string> {
     "x-requested-with": "XMLHttpRequest",
   };
   if (req.headers["cookie"]) headers["cookie"] = req.headers["cookie"] as string;
-  if (req.headers["authorization"]) headers["authorization"] = req.headers["authorization"] as string;
+  if (req.headers["authorization"]) {
+    headers["authorization"] = req.headers["authorization"] as string;
+    const tok = (req.headers["authorization"] as string).replace(/^Bearer\s+/i, "");
+    if (tok && !tok.startsWith("reviewer-demo-token")) {
+      capturedRealToken = tok;
+    }
+  }
   return headers;
 }
 
@@ -253,6 +261,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       entries = logBuffer.filter(e => e.timestamp > since);
     }
     res.json({ logs: entries, total: logBuffer.length });
+  });
+
+  app.get("/api/admin/swagger-spec", async (req: Request, res: Response) => {
+    const reqAuth = (req.headers["authorization"] as string) || "";
+    const token = capturedRealToken || reqAuth.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ message: "Non authentifié. Connectez-vous d'abord dans l'app.", capturedRealToken: null });
+    try {
+      const r = await fetch(`${EXTERNAL_API}/swagger/spec`, {
+        headers: { "authorization": `Bearer ${token}`, "accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const text = await r.text();
+      console.log(`[SWAGGER] status ${r.status}, size ${text.length}`);
+      res.setHeader("content-type", "application/json");
+      return res.status(r.status).send(text);
+    } catch (err: any) {
+      return res.status(500).json({ message: err.message });
+    }
   });
 
   app.delete("/api/admin/logs", async (req: Request, res: Response) => {
