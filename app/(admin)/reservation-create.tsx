@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform,
   TextInput, ActivityIndicator,
@@ -19,6 +19,8 @@ export default function ReservationCreateScreen() {
   const paramClientId = Array.isArray(params.clientId) ? params.clientId[0] : (params.clientId as string || "");
   const quoteId = Array.isArray(params.quoteId) ? params.quoteId[0] : (params.quoteId as string || "");
   const quoteName = Array.isArray(params.quoteName) ? params.quoteName[0] : (params.quoteName as string || "");
+  const editId = Array.isArray(params.editId) ? params.editId[0] : (params.editId as string || "");
+  const isEditMode = !!editId;
 
   const insets = useSafeAreaInsets();
   const theme = useTheme();
@@ -47,6 +49,37 @@ export default function ReservationCreateScreen() {
 
   const [selectedServiceId, setSelectedServiceId] = useState<string>("");
   const [showServicePicker, setShowServicePicker] = useState(false);
+  const [editLoaded, setEditLoaded] = useState(false);
+
+  const { data: editReservation } = useQuery({
+    queryKey: ["admin-reservation", editId],
+    queryFn: () => adminReservations.getById(editId),
+    enabled: isEditMode && !editLoaded,
+  });
+
+  useEffect(() => {
+    if (!isEditMode || editLoaded || !editReservation) return;
+    if (editReservation.clientId) setSelectedClientId(String(editReservation.clientId));
+    if (editReservation.notes) setNotes(editReservation.notes);
+    if (editReservation.quoteId) {
+      setPickedQuoteId(String(editReservation.quoteId));
+      setPickedQuoteName(editReservation.quoteReference || `Devis #${editReservation.quoteId}`);
+    }
+    if (editReservation.serviceId) setSelectedServiceId(String(editReservation.serviceId));
+    else if (editReservation.service_id) setSelectedServiceId(String(editReservation.service_id));
+    if (editReservation.serviceType) setServiceType(editReservation.serviceType);
+    const schedDate = editReservation.scheduledDate || editReservation.reservationDate || editReservation.date;
+    if (schedDate) {
+      const d = new Date(schedDate);
+      if (!isNaN(d.getTime())) setStartDate(d.toISOString());
+    }
+    const endD = editReservation.estimatedEndDate || editReservation.endDate;
+    if (endD) {
+      const d = new Date(endD);
+      if (!isNaN(d.getTime())) setEndDate(d.toISOString());
+    }
+    setEditLoaded(true);
+  }, [editReservation, isEditMode, editLoaded]);
 
   const { data: services = [], isLoading: servicesLoading } = useQuery({
     queryKey: ["admin-services"],
@@ -119,21 +152,25 @@ export default function ReservationCreateScreen() {
         scheduledDate: startDate,
         date: startDate,
         estimatedEndDate: endDate,
-        status: "pending",
       };
+      if (!isEditMode) payload.status = "pending";
       if (pickedQuoteId) payload.quoteId = pickedQuoteId;
       if (serviceType) payload.serviceType = serviceType;
       if (notes) payload.notes = notes;
+      if (isEditMode) {
+        return adminReservations.update(editId, payload);
+      }
       return adminReservations.create(payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-reservations"] });
+      if (isEditMode) queryClient.invalidateQueries({ queryKey: ["admin-reservation", editId] });
       queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       showAlert({
         type: "success",
-        title: "Rendez-vous créé",
-        message: "Le rendez-vous a été planifié avec succès.",
+        title: isEditMode ? "Rendez-vous modifié" : "Rendez-vous créé",
+        message: isEditMode ? "Le rendez-vous a été modifié avec succès." : "Le rendez-vous a été planifié avec succès.",
         buttons: [{ text: "OK", style: "primary", onPress: () => router.back() }],
       });
     },
@@ -141,16 +178,24 @@ export default function ReservationCreateScreen() {
       showAlert({
         type: "error",
         title: "Erreur",
-        message: err?.message || "Impossible de créer le rendez-vous.",
+        message: err?.message || (isEditMode ? "Impossible de modifier le rendez-vous." : "Impossible de créer le rendez-vous."),
         buttons: [{ text: "OK", style: "primary" }],
       });
     },
   });
 
-  const canSubmit = !!selectedClientId && !!selectedServiceId && !!startDate && !mutation.isPending;
+  const canSubmit = !!selectedClientId && (isEditMode || !!selectedServiceId) && !!startDate && !mutation.isPending;
 
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
+
+  if (isEditMode && !editLoaded) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -158,7 +203,7 @@ export default function ReservationCreateScreen() {
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="close" size={24} color={theme.text} />
         </Pressable>
-        <Text style={styles.headerTitle}>Nouveau rendez-vous</Text>
+        <Text style={styles.headerTitle}>{isEditMode ? "Modifier le rendez-vous" : "Nouveau rendez-vous"}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -380,8 +425,8 @@ export default function ReservationCreateScreen() {
           {mutation.isPending
             ? <ActivityIndicator color="#fff" />
             : <>
-                <Ionicons name="calendar-outline" size={18} color="#fff" />
-                <Text style={styles.submitBtnText}>Confirmer le rendez-vous</Text>
+                <Ionicons name={isEditMode ? "checkmark-circle-outline" : "calendar-outline"} size={18} color="#fff" />
+                <Text style={styles.submitBtnText}>{isEditMode ? "Enregistrer les modifications" : "Confirmer le rendez-vous"}</Text>
               </>
           }
         </Pressable>

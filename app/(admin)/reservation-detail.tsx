@@ -346,6 +346,16 @@ export default function ReservationDetailScreen() {
             <Text style={styles.prose}>{typeof r.productDetails === "string" ? r.productDetails : JSON.stringify(r.productDetails, null, 2)}</Text>
           </View>
         ) : null}
+
+        {statusKey !== "completed" && statusKey !== "cancelled" && (
+          <Pressable
+            style={styles.editBtn}
+            onPress={() => router.push({ pathname: "/(admin)/reservation-create", params: { editId: id } } as any)}
+          >
+            <Ionicons name="create-outline" size={18} color="#fff" />
+            <Text style={styles.editBtnText}>Modifier le rendez-vous</Text>
+          </Pressable>
+        )}
       </ScrollView>
     </View>
   );
@@ -381,4 +391,9 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   serviceChip: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: theme.background, borderWidth: 1, borderColor: theme.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   serviceChipText: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },
   serviceRow: { paddingTop: 4 },
+  editBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    backgroundColor: theme.primary, borderRadius: 14, height: 54, marginTop: 4,
+  },
+  editBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
