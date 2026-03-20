@@ -18,6 +18,17 @@ async function initDatabase() {
         user_data JSONB,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      CREATE TABLE IF NOT EXISTS document_amounts (
+        id SERIAL PRIMARY KEY,
+        doc_id TEXT NOT NULL UNIQUE,
+        doc_type TEXT NOT NULL,
+        price_excluding_tax NUMERIC,
+        total_including_tax NUMERIC,
+        tax_amount NUMERIC,
+        items JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
       CREATE TABLE IF NOT EXISTS quote_responses (
         id SERIAL PRIMARY KEY,
         quote_id TEXT NOT NULL,
@@ -1265,13 +1276,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const data = JSON.parse(result.text);
-        // Log complet de la réponse pour debug des montants
+        const routePath = path.replace(/\/$/, "");
+        const isQuoteRoute = routePath === "/quotes" || routePath.startsWith("/quotes/");
+        const isInvoiceRoute = routePath === "/invoices" || routePath.startsWith("/invoices/");
+        const docType = isQuoteRoute ? "quote" : isInvoiceRoute ? "invoice" : null;
+
+        // Extraire les montants du body de la requête (source de vérité pour la création)
+        const bodyHT = parseFloat(String(req.body?.priceExcludingTax || req.body?.totalHT || req.body?.total_excluding_tax || 0)) || 0;
+        const bodyTTC = parseFloat(String(req.body?.quoteAmount || req.body?.amount || req.body?.total || req.body?.total_including_tax || 0)) || 0;
+        const bodyItems = req.body?.items;
+
+        // Sauvegarder les montants localement après création réussie
+        if (req.method === "POST" && result.status < 300 && docType && data?.id && bodyTTC > 0) {
+          const taxAmt = bodyTTC - bodyHT;
+          pool.query(
+            `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, items=$6, updated_at=NOW()`,
+            [data.id, docType, bodyHT, bodyTTC, taxAmt, JSON.stringify(bodyItems || [])]
+          ).catch((e: any) => console.warn("[AMOUNTS] save failed:", e.message));
+          console.log(`[AMOUNTS] Saved ${docType} ${data.id}: HT=${bodyHT} TTC=${bodyTTC}`);
+        }
+
+        // Enrichir les réponses avec les montants locaux si l'API retourne 0
+        const enrichItem = async (item: any): Promise<any> => {
+          if (!item?.id) return item;
+          const apiHT = parseFloat(String(item.priceExcludingTax || item.totalHT || item.total_excluding_tax || 0)) || 0;
+          const apiTTC = parseFloat(String(item.quoteAmount || item.amount || item.totalTTC || item.total || item.total_including_tax || 0)) || 0;
+          if (apiHT > 0 || apiTTC > 0) return item;
+
+          // Essayer depuis la base locale d'abord
+          try {
+            const row = await pool.query("SELECT * FROM document_amounts WHERE doc_id=$1", [item.id]);
+            if (row.rows.length > 0) {
+              const r = row.rows[0];
+              const ht = parseFloat(r.price_excluding_tax) || 0;
+              const ttc = parseFloat(r.total_including_tax) || 0;
+              if (ttc > 0) {
+                return {
+                  ...item,
+                  priceExcludingTax: String(ht),
+                  quoteAmount: String(ttc),
+                  amount: String(ttc),
+                  total_excluding_tax: String(ht),
+                  total_including_tax: String(ttc),
+                  taxAmount: String(parseFloat(r.tax_amount) || (ttc - ht)),
+                  _localAmounts: true,
+                };
+              }
+            }
+          } catch {}
+
+          // Calculer depuis les items retournés par l'API si disponibles
+          const apiItems: any[] = item.items || item.lineItems || item.lines || [];
+          if (apiItems.length > 0) {
+            let calcHT = 0, calcTTC = 0;
+            for (const it of apiItems) {
+              const price = parseFloat(String(it.unit_price || it.unit_price_excluding_tax || it.unitPrice || it.unitPriceExcludingTax || it.price || 0)) || 0;
+              const qty = parseFloat(String(it.quantity || 1)) || 1;
+              const tax = parseFloat(String(it.tax_rate || it.taxRate || it.tvaRate || 0)) || 0;
+              const lineHT = parseFloat(String(it.total_excluding_tax || it.totalExcludingTax || 0)) || qty * price;
+              const lineTTC = parseFloat(String(it.total_including_tax || it.totalIncludingTax || it.totalPrice || 0)) || qty * price * (1 + tax / 100);
+              calcHT += lineHT;
+              calcTTC += lineTTC;
+            }
+            if (calcTTC > 0) {
+              // Stocker aussi pour les prochaines fois
+              pool.query(
+                `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, updated_at=NOW()`,
+                [item.id, docType, calcHT, calcTTC, calcTTC - calcHT, JSON.stringify(apiItems)]
+              ).catch(() => {});
+              return {
+                ...item,
+                priceExcludingTax: calcHT.toFixed(2),
+                quoteAmount: calcTTC.toFixed(2),
+                amount: calcTTC.toFixed(2),
+                total_excluding_tax: calcHT.toFixed(2),
+                total_including_tax: calcTTC.toFixed(2),
+                taxAmount: (calcTTC - calcHT).toFixed(2),
+                _computedAmounts: true,
+              };
+            }
+          }
+          return item;
+        };
+
+        let enriched = data;
+        if (docType && (req.method === "GET" || (req.method === "POST" && result.status < 300))) {
+          if (Array.isArray(data)) {
+            enriched = await Promise.all(data.map(enrichItem));
+          } else if (data?.id) {
+            enriched = await enrichItem(data);
+          } else if (data?.data && Array.isArray(data.data)) {
+            enriched = { ...data, data: await Promise.all(data.data.map(enrichItem)) };
+          }
+        }
+
         if (req.method === "POST" && result.status < 300) {
-          console.log(`[MOBILE-ADMIN-RESP] ${req.method} ${req.url} => keys: ${Object.keys(data).join(",")}, total: ${data.total ?? data.totalTTC ?? data.amount ?? "?"}, totalHT: ${data.total_excluding_tax ?? data.totalHT ?? data.priceExcludingTax ?? "?"}`);
+          console.log(`[MOBILE-ADMIN-RESP] ${req.method} ${req.url} => keys: ${Object.keys(enriched).join(",")}, total: ${enriched.quoteAmount ?? enriched.amount ?? "?"}, totalHT: ${enriched.priceExcludingTax ?? "?"}`);
         } else if (result.status >= 400) {
           console.log(`[MOBILE-ADMIN-ERR] ${req.method} ${req.url} => ${result.status}: ${result.text.substring(0, 400)}`);
         }
-        return res.status(result.status).json(data);
+        return res.status(result.status).json(enriched);
       } catch {
         return res.status(result.status).send(result.text);
       }
