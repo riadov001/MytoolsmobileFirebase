@@ -11,6 +11,7 @@ import { adminClients } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
+import { setPendingNewClientId } from "@/lib/new-client-store";
 
 const ROLE_OPTIONS = [
   { value: "client", label: "Particulier" },
@@ -22,6 +23,7 @@ export default function ClientFormScreen() {
   const rawId = params.id;
   const id = Array.isArray(rawId) ? rawId[0] : (typeof rawId === "string" ? rawId : "");
   const isEdit = id.length > 0;
+  const returnTo = Array.isArray(params.returnTo) ? params.returnTo[0] : (params.returnTo as string || "");
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
@@ -101,8 +103,14 @@ export default function ClientFormScreen() {
       if (!isEdit && password.trim()) {
         body.password = password.trim();
       }
-      if (isEdit) await adminClients.update(id, body);
-      else await adminClients.create(body);
+      if (isEdit) {
+        await adminClients.update(id, body);
+      } else {
+        const result = await adminClients.create(body);
+        if (returnTo && result?.id) {
+          setPendingNewClientId(String(result.id));
+        }
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
       if (isEdit) queryClient.invalidateQueries({ queryKey: ["admin-client", id] });

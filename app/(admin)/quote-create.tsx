@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput, ActivityIndicator, Alert, FlatList,
 } from "react-native";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
@@ -13,6 +13,7 @@ import { adminQuotes, adminClients, adminServices } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import OCRScannerModal, { OCRResult } from "@/components/OCRScannerModal";
+import { consumePendingNewClientId } from "@/lib/new-client-store";
 
 interface LineItem {
   description: string;
@@ -101,6 +102,17 @@ export default function QuoteCreateScreen() {
     }
     setEditLoaded(true);
   }, [editQuote, isEditMode, editLoaded]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const newId = consumePendingNewClientId();
+      if (newId) {
+        setSelectedClientId(newId);
+        setShowClientPicker(false);
+        queryClient.invalidateQueries({ queryKey: ["admin-clients"] });
+      }
+    }, [queryClient])
+  );
 
   const { data: clients = [], isLoading: clientsLoading } = useQuery({
     queryKey: ["admin-clients"],
@@ -409,6 +421,16 @@ export default function QuoteCreateScreen() {
                   autoCapitalize="none"
                 />
               </View>
+              <Pressable
+                style={styles.addClientBtn}
+                onPress={() => router.push({ pathname: "/(admin)/client-form", params: { returnTo: "quote-create" } })}
+              >
+                <View style={[styles.addClientIcon, { backgroundColor: theme.primary + "15" }]}>
+                  <Ionicons name="person-add" size={16} color={theme.primary} />
+                </View>
+                <Text style={[styles.addClientText, { color: theme.primary }]}>Nouveau client</Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+              </Pressable>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 {clientsLoading ? (
                   <ActivityIndicator size="small" color={theme.primary} style={{ padding: 12 }} />
@@ -418,14 +440,14 @@ export default function QuoteCreateScreen() {
                   filteredClients.map((c: any) => (
                     <Pressable
                       key={c.id}
-                      style={[styles.clientOption, selectedClientId === c.id && { backgroundColor: theme.primary + "20" }]}
+                      style={[styles.clientOption, String(selectedClientId) === String(c.id) && { backgroundColor: theme.primary + "20" }]}
                       onPress={() => {
-                        setSelectedClientId(c.id);
+                        setSelectedClientId(String(c.id));
                         setShowClientPicker(false);
                         setClientSearch("");
                       }}
                     >
-                      <Text style={[styles.clientOptionName, selectedClientId === c.id && { color: theme.primary }]}>
+                      <Text style={[styles.clientOptionName, String(selectedClientId) === String(c.id) && { color: theme.primary }]}>
                         {`${c.firstName || ""} ${c.lastName || ""}`.trim() || c.email}
                       </Text>
                       <Text style={styles.clientOptionEmail}>{c.email}</Text>
@@ -705,6 +727,17 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   clientOptionName: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.text },
   clientOptionEmail: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary, marginTop: 2 },
   noClient: { padding: 12, fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textTertiary, textAlign: "center" },
+  addClientBtn: {
+    flexDirection: "row", alignItems: "center", gap: 10,
+    paddingHorizontal: 12, paddingVertical: 11,
+    borderBottomWidth: 1, borderBottomColor: theme.border,
+    backgroundColor: theme.primary + "08",
+  },
+  addClientIcon: {
+    width: 30, height: 30, borderRadius: 8,
+    justifyContent: "center", alignItems: "center",
+  },
+  addClientText: { flex: 1, fontSize: 14, fontFamily: "Inter_600SemiBold" },
   textarea: {
     minHeight: 72, borderWidth: 1, borderColor: theme.border, borderRadius: 10,
     paddingHorizontal: 12, paddingTop: 10, paddingBottom: 10,
