@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator,
 } from "react-native";
@@ -8,11 +8,10 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminQuotes, adminClients, adminApiBase } from "@/lib/admin-api";
+import { adminQuotes, adminClients } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
-import { downloadPdfFile } from "@/lib/pdf-download";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente", approved: "Approuvé", rejected: "Rejeté",
@@ -90,43 +89,6 @@ export default function QuoteDetailScreen() {
     },
   });
 
-  const invoiceMutation = useMutation({
-    mutationFn: () => adminQuotes.convertToInvoice(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-invoices"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-analytics"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quotes"] });
-      queryClient.invalidateQueries({ queryKey: ["admin-quote", id] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      showAlert({
-        type: "success",
-        title: "Facture générée",
-        message: "La facture a été créée depuis ce devis avec succès.",
-        buttons: [{ text: "OK", style: "primary" }],
-      });
-    },
-    onError: (err: any) => {
-      showAlert({
-        type: "error",
-        title: "Erreur",
-        message: err?.message || "Impossible de générer la facture.",
-        buttons: [{ text: "OK", style: "primary" }],
-      });
-    },
-  });
-
-  const handleCreateInvoice = () => {
-    showAlert({
-      type: "warning",
-      title: "Générer une facture",
-      message: "Créer une facture depuis ce devis ?",
-      buttons: [
-        { text: "Annuler" },
-        { text: "Générer", style: "primary", onPress: () => invoiceMutation.mutate() },
-      ],
-    });
-  };
-
   const handleCreateReservation = () => {
     showAlert({
       type: "warning",
@@ -148,39 +110,6 @@ export default function QuoteDetailScreen() {
 
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
-
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const handlePdf = async () => {
-    Haptics.selectionAsync();
-    const directUrl = q?.pdfUrl || q?.pdf_url || q?.documentUrl;
-    const pdfFileName = `${q?.reference || q?.quoteNumber || "devis"}.pdf`;
-    
-    setPdfLoading(true);
-    try {
-      let urlToDownload = directUrl;
-      
-      if (!urlToDownload) {
-        const result = await adminQuotes.getPdf(id);
-        urlToDownload = result?.url || result?.pdfUrl || result?.pdf_url || result?.documentUrl;
-      }
-      
-      if (!urlToDownload) {
-        urlToDownload = `${adminApiBase}/api/admin/quotes/${id}/pdf`;
-      }
-      
-      await downloadPdfFile(urlToDownload, pdfFileName);
-    } catch (err: any) {
-      console.error("[QUOTE-PDF] Error:", err);
-      showAlert({ 
-        type: "error", 
-        title: "Erreur", 
-        message: err?.message || "Impossible de télécharger le PDF.", 
-        buttons: [{ text: "OK" }] 
-      });
-    } finally {
-      setPdfLoading(false);
-    }
-  };
 
   const handleCancel = () => {
     showAlert({
@@ -256,7 +185,6 @@ export default function QuoteDetailScreen() {
   const rawTotalTVA = q.taxAmount || q.tvaAmount || q.taxTotal || q.pricingTotals?.totalTVA;
   const totalTVA = parseFloat(String(rawTotalTVA)) || (totalTTC - totalHT);
   const photos: string[] = q.requestDetails?.mediaUrls || q.photos || q.mediaUrls || [];
-  const pdfUrl = q.pdfUrl || q.pdf_url || q.documentUrl;
 
   return (
     <View style={styles.container}>
@@ -420,43 +348,19 @@ export default function QuoteDetailScreen() {
         ) : null}
 
 
-        {/* Actions: Facture & RDV */}
+        {/* Actions: RDV */}
         {statusKey !== "cancelled" ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Actions</Text>
-            <View style={styles.actionRow}>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: "#3B82F6", opacity: invoiceMutation.isPending ? 0.6 : 1 }]}
-                onPress={handleCreateInvoice}
-                disabled={invoiceMutation.isPending}
-              >
-                {invoiceMutation.isPending
-                  ? <ActivityIndicator size="small" color="#fff" />
-                  : <Ionicons name="receipt-outline" size={18} color="#fff" />}
-                <Text style={styles.actionBtnText}>Générer facture</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: "#8B5CF6" }]}
-                onPress={handleCreateReservation}
-              >
-                <Ionicons name="calendar-outline" size={18} color="#fff" />
-                <Text style={styles.actionBtnText}>Créer RDV</Text>
-              </Pressable>
-            </View>
+            <Pressable
+              style={[styles.actionBtn, { backgroundColor: "#8B5CF6" }]}
+              onPress={handleCreateReservation}
+            >
+              <Ionicons name="calendar-outline" size={18} color="#fff" />
+              <Text style={styles.actionBtnText}>Créer un rendez-vous</Text>
+            </Pressable>
           </View>
         ) : null}
-
-        {/* PDF */}
-        <Pressable
-          style={[styles.pdfBtn, pdfLoading && { opacity: 0.7 }]}
-          onPress={handlePdf}
-          disabled={pdfLoading}
-        >
-          {pdfLoading
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Ionicons name="document-text-outline" size={20} color="#fff" />}
-          <Text style={styles.pdfBtnText}>{pdfLoading ? "Chargement…" : "Télécharger le PDF"}</Text>
-        </Pressable>
       </ScrollView>
       {AlertComponent}
     </View>
@@ -500,16 +404,7 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   statusActions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10, borderWidth: 1 },
   statusBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
-  pdfBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, backgroundColor: theme.primary, borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 20,
-  },
-  pdfBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  convertBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, borderRadius: 12, paddingVertical: 13, paddingHorizontal: 16 },
-  convertBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#fff" },
-  actionRow: { flexDirection: "row", gap: 10 },
-  actionBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 12, paddingVertical: 13 },
+  actionBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 12, paddingVertical: 13 },
   actionBtnText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#fff" },
   actionBtnSecondary: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: theme.primary + "50" },
   actionBtnSecondaryText: { fontSize: 13, fontFamily: "Inter_500Medium", color: theme.primary },

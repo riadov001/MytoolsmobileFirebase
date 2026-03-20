@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, ActivityIndicator,
 } from "react-native";
@@ -7,11 +7,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminInvoices, adminClients, adminApiBase } from "@/lib/admin-api";
+import { adminInvoices, adminClients } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
-import { downloadPdfFile } from "@/lib/pdf-download";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "En attente", paid: "Payée", cancelled: "Annulée",
@@ -99,39 +98,6 @@ export default function InvoiceDetailScreen() {
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
 
-  const [pdfLoading, setPdfLoading] = useState(false);
-  const handlePdf = async () => {
-    Haptics.selectionAsync();
-    const directUrl = inv?.pdfUrl || inv?.pdf_url || inv?.documentUrl;
-    const pdfFileName = `${inv?.invoiceNumber || inv?.reference || "facture"}.pdf`;
-    
-    setPdfLoading(true);
-    try {
-      let urlToDownload = directUrl;
-      
-      if (!urlToDownload) {
-        const result = await adminInvoices.getPdf(id);
-        urlToDownload = result?.url || result?.pdfUrl || result?.pdf_url || result?.documentUrl;
-      }
-      
-      if (!urlToDownload) {
-        urlToDownload = `${adminApiBase}/api/admin/invoices/${id}/pdf`;
-      }
-      
-      await downloadPdfFile(urlToDownload, pdfFileName);
-    } catch (err: any) {
-      console.error("[INVOICE-PDF] Error:", err);
-      showAlert({ 
-        type: "error", 
-        title: "Erreur", 
-        message: err?.message || "Impossible de télécharger le PDF.", 
-        buttons: [{ text: "OK" }] 
-      });
-    } finally {
-      setPdfLoading(false);
-    }
-  };
-
   if (isLoading) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
@@ -162,8 +128,6 @@ export default function InvoiceDetailScreen() {
   const totalHT = inv.total_excluding_tax || inv.priceExcludingTax || inv.totalHT || inv.totalExcludingTax || inv.subtotal || "";
   const totalTVA = inv.taxAmount || inv.vat_amount || inv.tvaAmount || inv.taxTotal || "";
   const totalTTC = inv.total_including_tax || inv.amount || inv.totalTTC || inv.total || inv.totalIncludingTax || "";
-  const pdfUrl = inv.pdfUrl || inv.pdf_url || inv.documentUrl;
-
   const { name, email, phone } = resolveClient(inv, clientMap);
 
   return (
@@ -299,18 +263,6 @@ export default function InvoiceDetailScreen() {
           </View>
         ) : null}
 
-        {/* PDF */}
-        <Pressable
-          style={[styles.pdfBtn, pdfLoading && { opacity: 0.7 }]}
-          onPress={handlePdf}
-          disabled={pdfLoading}
-        >
-          {pdfLoading
-            ? <ActivityIndicator size="small" color="#fff" />
-            : <Ionicons name="document-text-outline" size={20} color="#fff" />}
-          <Text style={styles.pdfBtnText}>{pdfLoading ? "Chargement…" : "Télécharger le PDF"}</Text>
-        </Pressable>
-
         {/* Status Actions */}
         {statusKey !== "paid" && (
           <View style={[styles.section, { gap: 8 }]}>
@@ -386,12 +338,6 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   totalRowMain: { paddingTop: 8, borderTopWidth: 1, borderTopColor: theme.border, marginTop: 4 },
   totalLabel: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.textSecondary },
   totalValue: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.text },
-  pdfBtn: {
-    flexDirection: "row", alignItems: "center", justifyContent: "center",
-    gap: 8, backgroundColor: theme.primary, borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 20,
-  },
-  pdfBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
   actionBtn: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 10, borderWidth: 1, borderColor: theme.border },
   actionBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold" },
 });
