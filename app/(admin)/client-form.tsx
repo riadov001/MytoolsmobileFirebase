@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from "react";
 import {
-  View, Text, StyleSheet, ScrollView, Pressable, TextInput, Platform, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Pressable, TextInput, Platform, ActivityIndicator, Linking,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -197,7 +197,18 @@ export default function ClientFormScreen() {
         )}
 
         <Text style={styles.label}>Téléphone</Text>
-        <TextInput style={styles.input} value={phone} onChangeText={setPhone} placeholder="06 12 34 56 78" placeholderTextColor={theme.textTertiary} keyboardType="phone-pad" />
+        <View style={styles.phoneRow}>
+          <TextInput style={[styles.input, { flex: 1 }]} value={phone} onChangeText={setPhone} placeholder="06 12 34 56 78" placeholderTextColor={theme.textTertiary} keyboardType="phone-pad" />
+          {isEdit && phone.trim() && (
+            <Pressable
+              style={[styles.callBtn, { backgroundColor: theme.primary }]}
+              onPress={() => Linking.openURL(`tel:${phone.replace(/\s/g, '')}`)}
+              accessibilityLabel="Appeler le client"
+            >
+              <Ionicons name="call" size={18} color="#fff" />
+            </Pressable>
+          )}
+        </View>
 
         <Text style={styles.sectionTitle}>Adresse</Text>
 
@@ -242,6 +253,8 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   roleChip: { flex: 1, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: theme.border, backgroundColor: theme.surface, alignItems: "center" },
   roleChipText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: theme.textSecondary },
   row: { flexDirection: "row", gap: 10 },
+  phoneRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  callBtn: { width: 48, height: 48, borderRadius: 12, justifyContent: "center", alignItems: "center" },
   saveBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: theme.primary, borderRadius: 14, height: 52, marginTop: 24 },
   saveBtnText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#fff" },
 });
