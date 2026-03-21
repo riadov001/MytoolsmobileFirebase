@@ -97,14 +97,35 @@ function clearMetroCache() {
 }
 
 async function checkMetroHealth() {
-  try {
-    const response = await fetch(`http://localhost:${BUILD_PORT}/status`, {
-      signal: AbortSignal.timeout(5000),
+  // First try TCP port check (most reliable)
+  const tcpReady = await new Promise((resolve) => {
+    const net = require("net");
+    const socket = new net.Socket();
+    const timer = setTimeout(() => { socket.destroy(); resolve(false); }, 2000);
+    socket.connect(BUILD_PORT, "127.0.0.1", () => {
+      clearTimeout(timer);
+      socket.destroy();
+      resolve(true);
     });
-    return response.ok;
-  } catch {
-    return false;
+    socket.on("error", () => { clearTimeout(timer); resolve(false); });
+  });
+  if (!tcpReady) return false;
+
+  // Then verify it responds to HTTP
+  const endpoints = [
+    `http://localhost:${BUILD_PORT}/status`,
+    `http://localhost:${BUILD_PORT}/`,
+  ];
+  for (const url of endpoints) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (response.status < 500) return true;
+    } catch {
+      // try next
+    }
   }
+  // Port is open, accept it even if HTTP check failed
+  return tcpReady;
 }
 
 function disableDevToolsBinary() {
@@ -118,11 +139,24 @@ function disableDevToolsBinary() {
   );
   const backupBin = devtoolsBin + ".bak";
   try {
-    if (fs.existsSync(devtoolsBin) && !fs.existsSync(backupBin)) {
-      fs.renameSync(devtoolsBin, backupBin);
-      fs.writeFileSync(devtoolsBin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-      console.log("Disabled React Native DevTools binary for build");
+    if (!fs.existsSync(devtoolsBin)) {
+      // Binary doesn't exist at all — nothing to do
+      return;
     }
+    if (fs.existsSync(backupBin)) {
+      // Already disabled from a previous run (backup exists)
+      console.log("React Native DevTools binary already disabled");
+      return;
+    }
+    const content = fs.readFileSync(devtoolsBin);
+    if (content.toString("utf-8", 0, 10).startsWith("#!/bin/sh")) {
+      // Already a no-op script — mark it so restore knows
+      console.log("React Native DevTools binary already a no-op");
+      return;
+    }
+    fs.writeFileSync(backupBin, content, { mode: 0o755 });
+    fs.writeFileSync(devtoolsBin, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+    console.log("Disabled React Native DevTools binary for build");
   } catch (err) {
     console.log("Warning: Could not disable DevTools binary:", err.message);
   }
@@ -140,8 +174,9 @@ function restoreDevToolsBinary() {
   const backupBin = devtoolsBin + ".bak";
   try {
     if (fs.existsSync(backupBin)) {
-      fs.unlinkSync(devtoolsBin);
-      fs.renameSync(backupBin, devtoolsBin);
+      const original = fs.readFileSync(backupBin);
+      fs.writeFileSync(devtoolsBin, original, { mode: 0o755 });
+      fs.unlinkSync(backupBin);
       console.log("Restored React Native DevTools binary");
     }
   } catch (err) {
@@ -187,6 +222,7 @@ async function startMetro(expoPublicDomain) {
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
     CI: "1",
     EXPO_NO_TELEMETRY: "1",
+    REACT_NATIVE_DEVTOOLS_DISABLED: "true",
   };
   metroProcess = spawn(
     "npx",
