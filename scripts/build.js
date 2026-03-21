@@ -105,6 +105,48 @@ async function checkMetroHealth() {
   }
 }
 
+function disableDevToolsBinary() {
+  const devtoolsBin = path.resolve(
+    process.cwd(),
+    "node_modules",
+    "@react-native",
+    "debugger-shell",
+    "bin",
+    "react-native-devtools"
+  );
+  const backupBin = devtoolsBin + ".bak";
+  try {
+    if (fs.existsSync(devtoolsBin) && !fs.existsSync(backupBin)) {
+      fs.renameSync(devtoolsBin, backupBin);
+      fs.writeFileSync(devtoolsBin, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+      console.log("Disabled React Native DevTools binary for build");
+    }
+  } catch (err) {
+    console.log("Warning: Could not disable DevTools binary:", err.message);
+  }
+}
+
+function restoreDevToolsBinary() {
+  const devtoolsBin = path.resolve(
+    process.cwd(),
+    "node_modules",
+    "@react-native",
+    "debugger-shell",
+    "bin",
+    "react-native-devtools"
+  );
+  const backupBin = devtoolsBin + ".bak";
+  try {
+    if (fs.existsSync(backupBin)) {
+      fs.unlinkSync(devtoolsBin);
+      fs.renameSync(backupBin, devtoolsBin);
+      console.log("Restored React Native DevTools binary");
+    }
+  } catch (err) {
+    console.log("Warning: Could not restore DevTools binary:", err.message);
+  }
+}
+
 async function startMetro(expoPublicDomain) {
   const isRunning = await checkMetroHealth();
   if (isRunning) {
@@ -112,13 +154,13 @@ async function startMetro(expoPublicDomain) {
     return;
   }
 
+  disableDevToolsBinary();
+
   console.log("Starting Metro...");
   console.log(`Setting EXPO_PUBLIC_DOMAIN=${expoPublicDomain}`);
   const env = {
     ...process.env,
     EXPO_PUBLIC_DOMAIN: expoPublicDomain,
-    EXPO_NO_INSPECTOR_PROXY: "1",
-    REACT_NATIVE_DEVTOOLS_DISABLED: "1",
   };
   metroProcess = spawn("npm", ["run", "expo:start:static:build"], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -550,6 +592,7 @@ async function main() {
 
   console.log("Build complete! Deploy to:", baseUrl);
 
+  restoreDevToolsBinary();
   if (metroProcess) {
     metroProcess.kill();
   }
@@ -558,6 +601,7 @@ async function main() {
 
 main().catch((error) => {
   console.error("Build failed:", error.message);
+  restoreDevToolsBinary();
   if (metroProcess) {
     metroProcess.kill();
   }
