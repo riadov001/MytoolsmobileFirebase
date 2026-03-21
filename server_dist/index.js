@@ -4,7 +4,8 @@ import express from "express";
 // server/routes.ts
 import { createServer } from "node:http";
 import pg from "pg";
-var EXTERNAL_API = (process.env.EXTERNAL_API_URL || "https://saas.mytoolsgroup.eu/api").replace(/\/$/, "");
+var EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
+console.log(`[CONFIG] External API: ${EXTERNAL_API}`);
 var pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL
 });
@@ -17,6 +18,17 @@ async function initDatabase() {
         email TEXT,
         user_data JSONB,
         created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE TABLE IF NOT EXISTS document_amounts (
+        id SERIAL PRIMARY KEY,
+        doc_id TEXT NOT NULL UNIQUE,
+        doc_type TEXT NOT NULL,
+        price_excluding_tax NUMERIC,
+        total_including_tax NUMERIC,
+        tax_amount NUMERIC,
+        items JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS quote_responses (
         id SERIAL PRIMARY KEY,
@@ -56,6 +68,7 @@ async function initDatabase() {
     console.warn("[DB] Init skipped:", err.message);
   }
 }
+var capturedRealToken = null;
 function getAuthHeaders(req) {
   const headers = {
     "host": new URL(EXTERNAL_API).host,
@@ -64,7 +77,13 @@ function getAuthHeaders(req) {
     "x-requested-with": "XMLHttpRequest"
   };
   if (req.headers["cookie"]) headers["cookie"] = req.headers["cookie"];
-  if (req.headers["authorization"]) headers["authorization"] = req.headers["authorization"];
+  if (req.headers["authorization"]) {
+    headers["authorization"] = req.headers["authorization"];
+    const tok = req.headers["authorization"].replace(/^Bearer\s+/i, "");
+    if (tok && !tok.startsWith("reviewer-demo-token")) {
+      capturedRealToken = tok;
+    }
+  }
   return headers;
 }
 function splitSetCookieHeader(header) {
@@ -133,94 +152,15 @@ console.error = (...args) => {
   origConsoleError(...args);
   pushLog("error", args.map(safeStringify).join(" "));
 };
-var APP_REVIEW_MODE = process.env.APP_REVIEW_MODE === "true" || process.env.NODE_ENV !== "production";
-var REVIEWER_EMAIL = "review@mytools.eu";
-var REVIEWER_PASSWORD = "000000";
-var REVIEWER_USER = {
-  id: "reviewer-demo-001",
-  email: REVIEWER_EMAIL,
-  firstName: "Apple",
-  lastName: "Reviewer",
-  phone: null,
-  address: null,
-  postalCode: null,
-  city: null,
-  profileImageUrl: null,
-  role: "admin",
-  garageId: "1",
-  companyName: "MyTools Demo Garage",
-  siret: null,
-  tvaNumber: null,
-  companyAddress: null,
-  companyPostalCode: null,
-  companyCity: null,
-  companyCountry: "FR",
-  createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-  updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-};
-function isReviewerLogin(body) {
-  return APP_REVIEW_MODE && body?.email === REVIEWER_EMAIL && body?.password === REVIEWER_PASSWORD;
-}
-function isReviewerToken(authHeader) {
-  return APP_REVIEW_MODE && authHeader.includes("reviewer-demo-token-");
-}
-var REVIEWER_DEMO_QUOTES = [
-  { id: "demo-q1", quoteNumber: "D-0042", clientId: "demo-c1", status: "pending", totalAmount: "1250.00", notes: "Remplacement pneus avant", items: [{ description: "Pneu Michelin 205/55R16", quantity: 2, unitPrice: "89.00", totalPrice: "178.00" }], photos: [], createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString(), vehicleInfo: { brand: "Peugeot", model: "308", year: 2021, plate: "AB-123-CD" } },
-  { id: "demo-q2", quoteNumber: "D-0041", clientId: "demo-c2", status: "accepted", totalAmount: "890.00", notes: "\xC9quilibrage + g\xE9om\xE9trie", items: [{ description: "\xC9quilibrage 4 roues", quantity: 1, unitPrice: "60.00", totalPrice: "60.00" }], photos: [], createdAt: new Date(Date.now() - 864e5).toISOString(), updatedAt: new Date(Date.now() - 864e5).toISOString(), vehicleInfo: { brand: "Renault", model: "Clio", year: 2020, plate: "EF-456-GH" } }
-];
-var REVIEWER_DEMO_INVOICES = [
-  { id: "demo-i1", quoteId: "demo-q2", clientId: "demo-c2", invoiceNumber: "F-0035", status: "paid", totalHT: "741.67", totalTTC: "890.00", tvaAmount: "148.33", tvaRate: "20", paidAt: (/* @__PURE__ */ new Date()).toISOString(), items: [{ description: "\xC9quilibrage 4 roues", quantity: 1, unitPrice: "60.00", totalPrice: "60.00" }], notes: null, createdAt: new Date(Date.now() - 1728e5).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() },
-  { id: "demo-i2", quoteId: null, clientId: "demo-c1", invoiceNumber: "F-0034", status: "pending", totalHT: "500.00", totalTTC: "600.00", tvaAmount: "100.00", tvaRate: "20", paidAt: null, items: [{ description: "Changement freins", quantity: 1, unitPrice: "500.00", totalPrice: "500.00" }], notes: "\xC0 r\xE9gler sous 30 jours", createdAt: new Date(Date.now() - 2592e5).toISOString(), updatedAt: new Date(Date.now() - 2592e5).toISOString() }
-];
-var REVIEWER_DEMO_RESERVATIONS = [
-  { id: "demo-r1", clientId: "demo-c1", quoteId: "demo-q1", serviceId: "demo-s1", reference: "RDV-2026-018", date: new Date(Date.now() + 864e5).toISOString(), scheduledDate: new Date(Date.now() + 864e5).toISOString(), estimatedEndDate: null, timeSlot: "09:00-10:30", status: "confirmed", notes: "Client confirm\xE9 par t\xE9l\xE9phone", vehicleInfo: { brand: "Peugeot", model: "308", year: 2021, plate: "AB-123-CD" }, wheelCount: 4, diameter: "16", priceExcludingTax: null, taxRate: null, taxAmount: null, productDetails: null, assignedEmployeeId: null, createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
-];
-var REVIEWER_DEMO_CLIENTS = [
-  { id: "demo-c1", email: "jean.dupont@example.com", firstName: "Jean", lastName: "Dupont", phone: "+33612345678", address: "12 Rue de Paris", postalCode: "75001", city: "Paris", role: "client", createdAt: new Date(Date.now() - 2592e6).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() },
-  { id: "demo-c2", email: "marie.bernard@example.com", firstName: "Marie", lastName: "Bernard", phone: "+33698765432", address: "5 Avenue Victor Hugo", postalCode: "69002", city: "Lyon", role: "client", createdAt: new Date(Date.now() - 5184e6).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
-];
-var REVIEWER_DEMO_SERVICES = [
-  { id: "demo-s1", garageId: "1", name: "Montage pneus", description: "Montage et \xE9quilibrage de pneus toutes dimensions", basePrice: "45.00", category: "Pneumatiques", isActive: true, estimatedDuration: "45 min", imageUrl: null, customFormFields: null, createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() },
-  { id: "demo-s2", garageId: "1", name: "G\xE9om\xE9trie", description: "R\xE9glage de la g\xE9om\xE9trie des trains roulants", basePrice: "89.00", category: "G\xE9om\xE9trie", isActive: true, estimatedDuration: "60 min", imageUrl: null, customFormFields: null, createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() }
-];
-function reviewerResponse() {
-  const token = "reviewer-demo-token-" + Date.now();
-  return {
-    user: REVIEWER_USER,
-    accessToken: token,
-    refreshToken: "reviewer-refresh-" + Date.now()
-  };
-}
 async function registerRoutes(app2) {
   await initDatabase();
-  app2.post("/api/mobile/login", (req, res, next) => {
-    if (isReviewerLogin(req.body)) {
-      console.log("[AUTH] Reviewer demo login via /api/mobile/login");
-      return res.status(200).json(reviewerResponse());
-    }
-    next();
-  });
-  app2.post("/api/mobile/auth/me", (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      return res.status(200).json(REVIEWER_USER);
-    }
-    next();
-  });
-  app2.get("/api/mobile/auth/me", (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      return res.status(200).json(REVIEWER_USER);
-    }
-    next();
-  });
   app2.get("/api/admin/logs", async (req, res) => {
     const auth = req.headers["authorization"] || "";
     if (!auth) {
       return res.status(401).json({ message: "Non authentifi\xE9" });
     }
     try {
-      const meRes = await fetch(`${EXTERNAL_API.replace(/\/api$/, "")}/api/mobile/auth/me`, {
+      const meRes = await fetch(`${EXTERNAL_API}/mobile/auth/me`, {
         headers: { "authorization": auth, "accept": "application/json" }
       });
       if (!meRes.ok) return res.status(401).json({ message: "Token invalide" });
@@ -239,13 +179,29 @@ async function registerRoutes(app2) {
     }
     res.json({ logs: entries, total: logBuffer.length });
   });
+  app2.get("/api/admin/swagger-spec", async (req, res) => {
+    const reqAuth = req.headers["authorization"] || "";
+    const token = capturedRealToken || reqAuth.replace(/^Bearer\s+/i, "");
+    if (!token) return res.status(401).json({ message: "Non authentifi\xE9. Connectez-vous d'abord dans l'app.", capturedRealToken: null });
+    try {
+      const r = await fetch(`${EXTERNAL_API}/swagger/spec`, {
+        headers: { "authorization": `Bearer ${token}`, "accept": "application/json", "X-Requested-With": "XMLHttpRequest" }
+      });
+      const text = await r.text();
+      console.log(`[SWAGGER] status ${r.status}, size ${text.length}`);
+      res.setHeader("content-type", "application/json");
+      return res.status(r.status).send(text);
+    } catch (err) {
+      return res.status(500).json({ message: err.message });
+    }
+  });
   app2.delete("/api/admin/logs", async (req, res) => {
     const auth = req.headers["authorization"] || "";
     if (!auth) {
       return res.status(401).json({ message: "Non authentifi\xE9" });
     }
     try {
-      const meRes = await fetch(`${EXTERNAL_API.replace(/\/api$/, "")}/api/mobile/auth/me`, {
+      const meRes = await fetch(`${EXTERNAL_API}/mobile/auth/me`, {
         headers: { "authorization": auth, "accept": "application/json" }
       });
       if (!meRes.ok) return res.status(401).json({ message: "Token invalide" });
@@ -424,7 +380,7 @@ async function registerRoutes(app2) {
       const headers = getAuthHeaders(req);
       let userEmail = "";
       try {
-        const userRes = await fetch(`${EXTERNAL_API}/auth/user`, { method: "GET", headers, redirect: "manual" });
+        const userRes = await fetch(`${EXTERNAL_API}/mobile/auth/me`, { method: "GET", headers, redirect: "manual" });
         if (userRes.ok) {
           const userData = await userRes.json();
           userEmail = userData?.email || userData?.user?.email || "";
@@ -506,7 +462,7 @@ async function registerRoutes(app2) {
       if (req.headers["authorization"]) {
         headers["authorization"] = req.headers["authorization"];
       }
-      const userRes = await fetch(`${EXTERNAL_API}/auth/user`, {
+      const userRes = await fetch(`${EXTERNAL_API}/mobile/auth/me`, {
         method: "GET",
         headers,
         redirect: "manual"
@@ -559,12 +515,6 @@ async function registerRoutes(app2) {
     }
   });
   app2.post("/api/login", async (req, res) => {
-    if (isReviewerLogin(req.body)) {
-      console.log("[AUTH] Reviewer demo login via /api/login");
-      const resp = reviewerResponse();
-      res.setHeader("X-Session-Cookie", "reviewer_session=demo");
-      return res.status(200).json(resp.user);
-    }
     try {
       const email = req.body?.email;
       if (email) {
@@ -582,7 +532,7 @@ async function registerRoutes(app2) {
           console.warn("[DB] deleted_accounts check skipped (DB unavailable):", dbErr.message);
         }
       }
-      const targetUrl = `${EXTERNAL_API}/login`;
+      const targetUrl = `${EXTERNAL_API}/mobile/auth/login`;
       const headers = {
         "host": new URL(EXTERNAL_API).host,
         "content-type": "application/json"
@@ -657,131 +607,7 @@ async function registerRoutes(app2) {
       res.status(502).json({ message: "Erreur de connexion au serveur API" });
     }
   });
-  app2.get("/api/proxy/invoice-pdf/:token", async (req, res) => {
-    try {
-      const { token } = req.params;
-      const pdfUrl = `${EXTERNAL_API}/public/invoices/${token}/pdf`;
-      const headers = {
-        "host": new URL(EXTERNAL_API).host,
-        "accept": "application/pdf,*/*"
-      };
-      if (req.headers["cookie"]) {
-        headers["cookie"] = req.headers["cookie"];
-      }
-      if (req.headers["authorization"]) {
-        headers["authorization"] = req.headers["authorization"];
-      }
-      const response = await fetch(pdfUrl, { headers, redirect: "follow" });
-      if (!response.ok) {
-        return res.status(response.status).json({ message: "Document introuvable." });
-      }
-      const contentType = response.headers.get("content-type") || "application/pdf";
-      res.setHeader("content-type", contentType);
-      res.setHeader("content-disposition", `attachment; filename="facture-${token}.pdf"`);
-      const buffer = await response.arrayBuffer();
-      res.send(Buffer.from(buffer));
-    } catch (err) {
-      console.error("[PDF PROXY] error:", err.message);
-      res.status(502).json({ message: "Erreur lors du t\xE9l\xE9chargement du PDF." });
-    }
-  });
-  app2.get("/api/proxy/quote-pdf/:token", async (req, res) => {
-    try {
-      const { token } = req.params;
-      const pdfUrl = `${EXTERNAL_API}/public/quotes/${token}/pdf`;
-      const headers = {
-        "host": new URL(EXTERNAL_API).host,
-        "accept": "application/pdf,*/*"
-      };
-      if (req.headers["cookie"]) {
-        headers["cookie"] = req.headers["cookie"];
-      }
-      if (req.headers["authorization"]) {
-        headers["authorization"] = req.headers["authorization"];
-      }
-      const response = await fetch(pdfUrl, { headers, redirect: "follow" });
-      if (!response.ok) {
-        return res.status(response.status).json({ message: "Document introuvable." });
-      }
-      const contentType = response.headers.get("content-type") || "application/pdf";
-      res.setHeader("content-type", contentType);
-      res.setHeader("content-disposition", `attachment; filename="devis-${token}.pdf"`);
-      const buffer = await response.arrayBuffer();
-      res.send(Buffer.from(buffer));
-    } catch (err) {
-      console.error("[PDF PROXY] error:", err.message);
-      res.status(502).json({ message: "Erreur lors du t\xE9l\xE9chargement du PDF." });
-    }
-  });
-  app2.get("/api/mobile/quotes/:id/pdf", async (req, res) => {
-    const { id } = req.params;
-    const authHeaders = getAuthHeaders(req);
-    const attempts = [
-      `${EXTERNAL_API}/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/admin/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/mobile/admin/quotes/${id}/pdf`,
-      `${EXTERNAL_API}/public/quotes/${id}/pdf`
-    ];
-    for (const url of attempts) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeaders, "accept": "application/pdf,application/json,*/*" }, redirect: "follow" });
-        if (!r.ok) continue;
-        const ct = r.headers.get("content-type") || "";
-        if (ct.includes("pdf")) {
-          res.setHeader("content-type", "application/pdf");
-          res.setHeader("content-disposition", `inline; filename="devis-${id}.pdf"`);
-          const buf = await r.arrayBuffer();
-          return res.send(Buffer.from(buf));
-        }
-        const txt = await r.text();
-        if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
-          try {
-            const parsed = JSON.parse(txt);
-            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
-            if (pdfUrl) return res.json({ url: pdfUrl });
-          } catch {
-          }
-        }
-      } catch {
-      }
-    }
-    return res.status(404).json({ message: "PDF non disponible pour ce devis." });
-  });
-  app2.get("/api/mobile/invoices/:id/pdf", async (req, res) => {
-    const { id } = req.params;
-    const authHeaders = getAuthHeaders(req);
-    const attempts = [
-      `${EXTERNAL_API}/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/admin/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/mobile/admin/invoices/${id}/pdf`,
-      `${EXTERNAL_API}/public/invoices/${id}/pdf`
-    ];
-    for (const url of attempts) {
-      try {
-        const r = await fetch(url, { headers: { ...authHeaders, "accept": "application/pdf,application/json,*/*" }, redirect: "follow" });
-        if (!r.ok) continue;
-        const ct = r.headers.get("content-type") || "";
-        if (ct.includes("pdf")) {
-          res.setHeader("content-type", "application/pdf");
-          res.setHeader("content-disposition", `inline; filename="facture-${id}.pdf"`);
-          const buf = await r.arrayBuffer();
-          return res.send(Buffer.from(buf));
-        }
-        const txt = await r.text();
-        if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
-          try {
-            const parsed = JSON.parse(txt);
-            const pdfUrl = parsed?.url || parsed?.pdfUrl || parsed?.pdf_url || parsed?.documentUrl || parsed?.link;
-            if (pdfUrl) return res.json({ url: pdfUrl });
-          } catch {
-          }
-        }
-      } catch {
-      }
-    }
-    return res.status(404).json({ message: "PDF non disponible pour cette facture." });
-  });
-  app2.get("/api/mobile/admin/reservations/:id/services", async (req, res) => {
+  app2.get("/api/admin/reservations/:id/services", async (req, res) => {
     const { id } = req.params;
     const authHeaders = getAuthHeaders(req);
     const attempts = [
@@ -1240,100 +1066,7 @@ async function registerRoutes(app2) {
       return res.status(502).json({ message: "Erreur de connexion" });
     }
   });
-  app2.use("/api/mobile/admin", async (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      const path2 = req.url.replace(/\?.*$/, "");
-      const method = req.method;
-      if (path2 === "/analytics" || path2 === "/analytics/") {
-        return res.json({
-          totalRevenue: 12840,
-          pendingRevenue: 3200,
-          totalClients: 247,
-          totalReservations: 18,
-          totalQuotes: 42,
-          totalInvoices: 35,
-          revenueChart: [
-            { month: "Jan", amount: 8200 },
-            { month: "F\xE9v", amount: 9500 },
-            { month: "Mar", amount: 7800 },
-            { month: "Avr", amount: 11200 },
-            { month: "Mai", amount: 10100 },
-            { month: "Juin", amount: 12840 }
-          ],
-          recentActivity: [
-            { type: "quote", message: "Nouveau devis #0042 cr\xE9\xE9", createdAt: (/* @__PURE__ */ new Date()).toISOString() },
-            { type: "reservation", message: "RDV confirm\xE9 \u2014 M. Bernard", createdAt: (/* @__PURE__ */ new Date()).toISOString() },
-            { type: "invoice", message: "Facture #F-0035 pay\xE9e", createdAt: (/* @__PURE__ */ new Date()).toISOString() }
-          ]
-        });
-      }
-      if (path2 === "/advanced-analytics" || path2 === "/advanced-analytics/") {
-        return res.json({ data: {} });
-      }
-      if (path2 === "/quotes" && method === "GET") return res.json(REVIEWER_DEMO_QUOTES);
-      if (path2.match(/^\/quotes\/[^/]+$/) && method === "GET") {
-        const id = path2.split("/")[2];
-        return res.json(REVIEWER_DEMO_QUOTES.find((q) => q.id === id) || REVIEWER_DEMO_QUOTES[0]);
-      }
-      if (path2 === "/quotes" && method === "POST") {
-        const newQuote = {
-          ...req.body,
-          id: "demo-q-new-" + Date.now(),
-          quoteNumber: "D-0043",
-          totalAmount: req.body.totalTTC || req.body.totalAmount,
-          photos: req.body.photos || [],
-          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-        };
-        REVIEWER_DEMO_QUOTES = [newQuote, ...REVIEWER_DEMO_QUOTES];
-        return res.status(201).json(newQuote);
-      }
-      if (path2.match(/^\/quotes\/[^/]+$/) && (method === "PATCH" || method === "PUT")) return res.json({ success: true, message: "Devis mis \xE0 jour" });
-      if (path2.match(/^\/quotes\/[^/]+\/status$/) && method === "PATCH") return res.json({ success: true, message: "Statut mis \xE0 jour" });
-      if (path2.match(/^\/quotes\/[^/]+$/) && method === "DELETE") return res.json({ success: true, message: "Devis supprim\xE9" });
-      if (path2 === "/invoices" && method === "GET") return res.json(REVIEWER_DEMO_INVOICES);
-      if (path2.match(/^\/invoices\/[^/]+$/) && method === "GET") {
-        const id = path2.split("/")[2];
-        return res.json(REVIEWER_DEMO_INVOICES.find((i) => i.id === id) || REVIEWER_DEMO_INVOICES[0]);
-      }
-      if (path2 === "/invoices" && method === "POST") {
-        const newInvoice = { ...req.body, id: "demo-i-new-" + Date.now(), invoiceNumber: "F-0036", createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() };
-        REVIEWER_DEMO_INVOICES = [newInvoice, ...REVIEWER_DEMO_INVOICES];
-        return res.status(201).json(newInvoice);
-      }
-      if (path2.match(/^\/invoices\/[^/]+$/) && (method === "PATCH" || method === "PUT")) return res.json({ success: true, message: "Facture mise \xE0 jour" });
-      if (path2.match(/^\/invoices\/[^/]+\/status$/) && method === "PATCH") return res.json({ success: true, message: "Statut mis \xE0 jour" });
-      if (path2.match(/^\/invoices\/[^/]+$/) && method === "DELETE") return res.json({ success: true, message: "Facture supprim\xE9e" });
-      if (path2 === "/reservations" && method === "GET") return res.json(REVIEWER_DEMO_RESERVATIONS);
-      if (path2.match(/^\/reservations\/[^/]+$/) && method === "GET") {
-        const id = path2.split("/")[2];
-        return res.json(REVIEWER_DEMO_RESERVATIONS.find((r) => r.id === id) || REVIEWER_DEMO_RESERVATIONS[0]);
-      }
-      if (path2 === "/reservations" && method === "POST") return res.status(201).json({ ...req.body, id: "demo-r-new-" + Date.now(), reference: "RDV-2026-019", createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (path2.match(/^\/reservations\/[^/]+$/) && (method === "PATCH" || method === "PUT")) return res.json({ success: true, message: "R\xE9servation mise \xE0 jour" });
-      if (path2.match(/^\/reservations\/[^/]+\/status$/) && method === "PATCH") return res.json({ success: true, message: "Statut mis \xE0 jour" });
-      if (path2.match(/^\/reservations\/[^/]+$/) && method === "DELETE") return res.json({ success: true, message: "R\xE9servation supprim\xE9e" });
-      if (path2 === "/users" && method === "GET") return res.json(REVIEWER_DEMO_CLIENTS);
-      if (path2.match(/^\/users\/[^/]+$/) && method === "GET") {
-        const id = path2.split("/")[2];
-        return res.json(REVIEWER_DEMO_CLIENTS.find((c) => c.id === id) || REVIEWER_DEMO_CLIENTS[0]);
-      }
-      if (path2 === "/users" && method === "POST") return res.status(201).json({ ...req.body, id: "demo-c-new-" + Date.now(), createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (path2.match(/^\/users\/[^/]+$/) && (method === "PATCH" || method === "PUT")) return res.json({ success: true, message: "Client mis \xE0 jour" });
-      if (path2.match(/^\/users\/[^/]+$/) && method === "DELETE") return res.json({ success: true, message: "Client supprim\xE9" });
-      if (path2 === "/services" && method === "GET") return res.json(REVIEWER_DEMO_SERVICES);
-      if (path2.match(/^\/services\/[^/]+$/) && method === "GET") {
-        const id = path2.split("/")[2];
-        return res.json(REVIEWER_DEMO_SERVICES.find((s) => s.id === id) || REVIEWER_DEMO_SERVICES[0]);
-      }
-      if (path2 === "/services" && method === "POST") return res.status(201).json({ ...req.body, id: "demo-s-new-" + Date.now(), createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (path2.match(/^\/services\/[^/]+$/) && (method === "PATCH" || method === "PUT")) return res.json({ success: true, message: "Service mis \xE0 jour" });
-      if (path2.match(/^\/services\/[^/]+$/) && method === "DELETE") return res.json({ success: true, message: "Service supprim\xE9" });
-      if (path2 === "/settings" && method === "GET") return res.json(REVIEWER_USER);
-      if (path2 === "/settings" && method === "PATCH") return res.json({ success: true, message: "Param\xE8tres mis \xE0 jour" });
-      return res.json({ success: true, message: "OK" });
-    }
+  app2.use("/api/admin", async (req, res, next) => {
     try {
       const authHeaders = {
         "host": new URL(EXTERNAL_API).host,
@@ -1350,50 +1083,53 @@ async function registerRoutes(app2) {
       };
       const path2 = req.url.replace(/\?.*$/, "");
       if ((path2.replace(/\/$/, "") === "/invoices" || path2.replace(/\/$/, "") === "/quotes") && req.method === "POST" && req.body) {
-        const fieldMap = {
-          "priceExcludingTax": "unit_price_excluding_tax",
-          "unitPrice": "unit_price",
-          "taxRate": "tax_rate",
-          "tvaRate": "tax_rate",
-          "quantity": "quantity",
-          "description": "description"
+        const htVal = req.body.totalHT || req.body.priceExcludingTax || req.body.total_excluding_tax;
+        const ttcVal = req.body.totalTTC || req.body.quoteAmount || req.body.amount || req.body.total || req.body.total_including_tax;
+        const taxVal = req.body.tvaRate || req.body.taxRate || req.body.tax_rate;
+        if (htVal) {
+          req.body.priceExcludingTax = htVal;
+          req.body.total_excluding_tax = htVal;
+        }
+        if (ttcVal) {
+          req.body.quoteAmount = ttcVal;
+          req.body.total = ttcVal;
+          req.body.total_including_tax = ttcVal;
+          req.body.amount = ttcVal;
+        }
+        if (taxVal) {
+          req.body.taxRate = taxVal;
+          req.body.tax_rate = taxVal;
+        }
+        const normalizeItem = (it) => {
+          const clean = { ...it };
+          if (it.unitPrice !== void 0 && !clean.unit_price) clean.unit_price = String(it.unitPrice);
+          if (it.unitPriceExcludingTax !== void 0 && !clean.unit_price_excluding_tax) clean.unit_price_excluding_tax = String(it.unitPriceExcludingTax);
+          if (it.priceExcludingTax !== void 0 && !clean.unit_price_excluding_tax) clean.unit_price_excluding_tax = String(it.priceExcludingTax);
+          if (it.taxRate !== void 0 && !clean.tax_rate) clean.tax_rate = String(it.taxRate);
+          if (it.tvaRate !== void 0 && !clean.tax_rate) clean.tax_rate = String(it.tvaRate);
+          if (it.totalExcludingTax !== void 0 && !clean.total_excluding_tax) clean.total_excluding_tax = String(it.totalExcludingTax);
+          if (it.totalIncludingTax !== void 0 && !clean.total_including_tax) clean.total_including_tax = String(it.totalIncludingTax);
+          const price = clean.unit_price || clean.unit_price_excluding_tax;
+          if (price) {
+            clean.unit_price = String(price);
+            clean.unit_price_excluding_tax = String(price);
+          }
+          if (clean.quantity !== void 0) clean.quantity = typeof clean.quantity === "string" ? parseFloat(clean.quantity) : clean.quantity;
+          return clean;
         };
         if (Array.isArray(req.body.items)) {
-          req.body.items = req.body.items.map((it) => {
-            const clean = {};
-            for (const originalKey of Object.keys(fieldMap)) {
-              if (it[originalKey] !== void 0) {
-                const apiKey = fieldMap[originalKey];
-                if (originalKey === "quantity") {
-                  clean[apiKey] = typeof it[originalKey] === "string" ? parseFloat(it[originalKey]) : it[originalKey];
-                } else {
-                  clean[apiKey] = String(it[originalKey]);
-                }
-              }
-            }
-            return clean;
-          });
+          req.body.items = req.body.items.map(normalizeItem);
         }
         if (Array.isArray(req.body.lineItems)) {
-          req.body.lineItems = req.body.lineItems.map((it) => {
-            const clean = {};
-            for (const originalKey of Object.keys(fieldMap)) {
-              if (it[originalKey] !== void 0) {
-                const apiKey = fieldMap[originalKey];
-                if (originalKey === "quantity") {
-                  clean[apiKey] = typeof it[originalKey] === "string" ? parseFloat(it[originalKey]) : it[originalKey];
-                } else {
-                  clean[apiKey] = String(it[originalKey]);
-                }
-              }
-            }
-            return clean;
-          });
+          req.body.lineItems = req.body.lineItems.map(normalizeItem);
         }
-        if (path2.replace(/\/$/, "") === "/quotes" && !req.body.serviceId) {
-          req.body.serviceId = "demo-s1";
+        if (Array.isArray(req.body.items) && !Array.isArray(req.body.lineItems)) {
+          req.body.lineItems = req.body.items;
         }
-        console.log(`[SANITIZE] ${path2} Cleaned body:`, JSON.stringify(req.body).substring(0, 500));
+        if (Array.isArray(req.body.lineItems) && !Array.isArray(req.body.items)) {
+          req.body.items = req.body.lineItems;
+        }
+        console.log(`[SANITIZE] ${path2} Full body:`, JSON.stringify(req.body).substring(0, 800));
       }
       const { body, contentType } = buildBody();
       if (contentType) authHeaders["content-type"] = contentType;
@@ -1405,14 +1141,21 @@ async function registerRoutes(app2) {
         if (txt.includes("<!DOCTYPE") || txt.includes("<html")) return null;
         return { status: r.status, text: txt, headers: r.headers };
       };
+      const adminUrl = `${EXTERNAL_API}/admin${req.url}`;
       const mobileUrl = `${EXTERNAL_API}/mobile/admin${req.url}`;
       let result = await tryUrl(mobileUrl);
       if (!result) {
-        const legacyUrl = `${EXTERNAL_API}/admin${req.url}`;
-        result = await tryUrl(legacyUrl);
+        result = await tryUrl(adminUrl);
         if (result) console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${result.status} (legacy fallback)`);
       } else {
         console.log(`[MOBILE-ADMIN] ${req.method} /mobile/admin${req.url} => ${result.status}`);
+        if (result.status >= 400) {
+          const fallback = await tryUrl(adminUrl);
+          if (fallback && fallback.status < result.status) {
+            console.log(`[MOBILE-ADMIN] ${req.method} /admin${req.url} => ${fallback.status} (legacy fallback, better than ${result.status})`);
+            result = fallback;
+          }
+        }
       }
       if (!result) {
         const isMutation = !["GET", "HEAD"].includes(req.method);
@@ -1428,7 +1171,99 @@ async function registerRoutes(app2) {
       });
       try {
         const data = JSON.parse(result.text);
-        return res.status(result.status).json(data);
+        const routePath = path2.replace(/\/$/, "");
+        const isQuoteRoute = routePath === "/quotes" || routePath.startsWith("/quotes/");
+        const isInvoiceRoute = routePath === "/invoices" || routePath.startsWith("/invoices/");
+        const docType = isQuoteRoute ? "quote" : isInvoiceRoute ? "invoice" : null;
+        const bodyHT = parseFloat(String(req.body?.priceExcludingTax || req.body?.totalHT || req.body?.total_excluding_tax || 0)) || 0;
+        const bodyTTC = parseFloat(String(req.body?.quoteAmount || req.body?.amount || req.body?.total || req.body?.total_including_tax || 0)) || 0;
+        const bodyItems = req.body?.items;
+        if (req.method === "POST" && result.status < 300 && docType && data?.id && bodyTTC > 0) {
+          const taxAmt = bodyTTC - bodyHT;
+          pool.query(
+            `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, items=$6, updated_at=NOW()`,
+            [data.id, docType, bodyHT, bodyTTC, taxAmt, JSON.stringify(bodyItems || [])]
+          ).catch((e) => console.warn("[AMOUNTS] save failed:", e.message));
+          console.log(`[AMOUNTS] Saved ${docType} ${data.id}: HT=${bodyHT} TTC=${bodyTTC}`);
+        }
+        const enrichItem = async (item) => {
+          if (!item?.id) return item;
+          const apiHT = parseFloat(String(item.priceExcludingTax || item.totalHT || item.total_excluding_tax || 0)) || 0;
+          const apiTTC = parseFloat(String(item.quoteAmount || item.amount || item.totalTTC || item.total || item.total_including_tax || 0)) || 0;
+          if (apiHT > 0 || apiTTC > 0) return item;
+          try {
+            const row = await pool.query("SELECT * FROM document_amounts WHERE doc_id=$1", [item.id]);
+            if (row.rows.length > 0) {
+              const r = row.rows[0];
+              const ht = parseFloat(r.price_excluding_tax) || 0;
+              const ttc = parseFloat(r.total_including_tax) || 0;
+              if (ttc > 0) {
+                return {
+                  ...item,
+                  priceExcludingTax: String(ht),
+                  quoteAmount: String(ttc),
+                  amount: String(ttc),
+                  total_excluding_tax: String(ht),
+                  total_including_tax: String(ttc),
+                  taxAmount: String(parseFloat(r.tax_amount) || ttc - ht),
+                  _localAmounts: true
+                };
+              }
+            }
+          } catch {
+          }
+          const apiItems = item.items || item.lineItems || item.lines || [];
+          if (apiItems.length > 0) {
+            let calcHT = 0, calcTTC = 0;
+            for (const it of apiItems) {
+              const price = parseFloat(String(it.unit_price || it.unit_price_excluding_tax || it.unitPrice || it.unitPriceExcludingTax || it.price || 0)) || 0;
+              const qty = parseFloat(String(it.quantity || 1)) || 1;
+              const tax = parseFloat(String(it.tax_rate || it.taxRate || it.tvaRate || 0)) || 0;
+              const lineHT = parseFloat(String(it.total_excluding_tax || it.totalExcludingTax || 0)) || qty * price;
+              const lineTTC = parseFloat(String(it.total_including_tax || it.totalIncludingTax || it.totalPrice || 0)) || qty * price * (1 + tax / 100);
+              calcHT += lineHT;
+              calcTTC += lineTTC;
+            }
+            if (calcTTC > 0) {
+              pool.query(
+                `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
+                 VALUES ($1, $2, $3, $4, $5, $6)
+                 ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, updated_at=NOW()`,
+                [item.id, docType, calcHT, calcTTC, calcTTC - calcHT, JSON.stringify(apiItems)]
+              ).catch(() => {
+              });
+              return {
+                ...item,
+                priceExcludingTax: calcHT.toFixed(2),
+                quoteAmount: calcTTC.toFixed(2),
+                amount: calcTTC.toFixed(2),
+                total_excluding_tax: calcHT.toFixed(2),
+                total_including_tax: calcTTC.toFixed(2),
+                taxAmount: (calcTTC - calcHT).toFixed(2),
+                _computedAmounts: true
+              };
+            }
+          }
+          return item;
+        };
+        let enriched = data;
+        if (docType && (req.method === "GET" || req.method === "POST" && result.status < 300)) {
+          if (Array.isArray(data)) {
+            enriched = await Promise.all(data.map(enrichItem));
+          } else if (data?.id) {
+            enriched = await enrichItem(data);
+          } else if (data?.data && Array.isArray(data.data)) {
+            enriched = { ...data, data: await Promise.all(data.data.map(enrichItem)) };
+          }
+        }
+        if (req.method === "POST" && result.status < 300) {
+          console.log(`[MOBILE-ADMIN-RESP] ${req.method} ${req.url} => keys: ${Object.keys(enriched).join(",")}, total: ${enriched.quoteAmount ?? enriched.amount ?? "?"}, totalHT: ${enriched.priceExcludingTax ?? "?"}`);
+        } else if (result.status >= 400) {
+          console.log(`[MOBILE-ADMIN-ERR] ${req.method} ${req.url} => ${result.status}: ${result.text.substring(0, 400)}`);
+        }
+        return res.status(result.status).json(enriched);
       } catch {
         return res.status(result.status).send(result.text);
       }
@@ -1511,215 +1346,65 @@ async function registerRoutes(app2) {
       return res.status(result.status).send(result.text);
     }
   }
-  app2.use("/api/mobile/invoices", async (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      const method = req.method;
-      const id = req.url.split("/").filter(Boolean)[0] || "";
-      if (method === "POST") return res.status(201).json({ ...req.body, id: "demo-i-new-" + Date.now(), invoiceNumber: "F-0036", status: req.body?.status || "pending", createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (method === "PATCH") return res.json({ ...REVIEWER_DEMO_INVOICES[0], ...req.body, id, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (method === "DELETE") return res.json({ success: true, message: "Facture supprim\xE9e" });
-      return next();
-    }
+  app2.use("/api/invoices", async (req, res, next) => {
     return mobileCrudProxy(req, res, "mobile/invoices", ["mobile/admin/invoices", "admin/invoices"]);
   });
-  app2.use("/api/mobile/reservations", async (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      const method = req.method;
-      const id = req.url.split("/").filter(Boolean)[0] || "";
-      if (method === "POST") return res.status(201).json({ ...req.body, id: "demo-r-new-" + Date.now(), reference: "RDV-2026-019", status: req.body?.status || "pending", scheduledDate: req.body?.scheduledDate || (/* @__PURE__ */ new Date()).toISOString(), createdAt: (/* @__PURE__ */ new Date()).toISOString(), updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (method === "PATCH") return res.json({ ...REVIEWER_DEMO_RESERVATIONS[0], ...req.body, id, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (method === "DELETE") return res.json({ success: true, message: "R\xE9servation supprim\xE9e" });
-      return next();
-    }
+  app2.use("/api/reservations", async (req, res, next) => {
     return mobileCrudProxy(req, res, "mobile/reservations", ["mobile/admin/reservations", "admin/reservations"]);
   });
-  app2.post("/api/mobile/quotes/:id/convert-to-invoice", async (req, res) => {
-    const { id } = req.params;
-    const authHeaders = {
+  app2.use("/api/quotes", async (req, res, next) => {
+    return mobileCrudProxy(req, res, "mobile/quotes", ["mobile/admin/quotes", "admin/quotes"]);
+  });
+  app2.get("/api/auth/me", async (req, res) => {
+    const headers = {
       "host": new URL(EXTERNAL_API).host,
       "accept": "application/json",
-      "content-type": "application/json",
       "x-requested-with": "XMLHttpRequest"
     };
-    if (req.headers["authorization"]) authHeaders["authorization"] = req.headers["authorization"];
-    if (req.headers["cookie"]) authHeaders["cookie"] = req.headers["cookie"];
-    const fetchOpts = { method: "POST", headers: authHeaders, redirect: "manual" };
-    const tryConvertUrl = async (url) => {
-      try {
-        const r = await fetch(url, fetchOpts);
-        const txt = await r.text();
-        if (txt.includes("<!DOCTYPE") || txt.includes("<html")) return null;
-        const parsed = JSON.parse(txt);
-        const msgStr = typeof parsed?.message === "string" ? parsed.message.toLowerCase() : "";
-        const errStr = typeof parsed?.error === "string" ? parsed.error.toLowerCase() : "";
-        if (r.ok && parsed && !msgStr.includes("unexpected") && !errStr.includes("unexpected")) {
-          return { status: r.status, data: parsed };
-        }
-        return null;
-      } catch {
-        return null;
-      }
-    };
-    const convertEndpoints = [
-      `${EXTERNAL_API}/mobile/admin/quotes/${id}/convert-to-invoice`,
-      `${EXTERNAL_API}/admin/quotes/${id}/convert-to-invoice`,
-      `${EXTERNAL_API}/mobile/quotes/${id}/convert-to-invoice`
-    ];
-    for (const url of convertEndpoints) {
-      const result = await tryConvertUrl(url);
-      if (result) {
-        console.log(`[CONVERT-INVOICE] \u2705 Success via ${url}`);
-        return res.status(result.status).json(result.data);
-      }
-    }
-    console.log(`[CONVERT-INVOICE] External endpoints failed, falling back to manual invoice creation for quote ${id}`);
+    if (req.headers["authorization"]) headers["authorization"] = req.headers["authorization"];
+    if (req.headers["cookie"]) headers["cookie"] = req.headers["cookie"];
     try {
-      const quoteSegments = ["mobile/admin/quotes", "admin/quotes", "mobile/quotes"];
-      let quoteData = null;
-      for (const seg of quoteSegments) {
-        try {
-          const r = await fetch(`${EXTERNAL_API}/${seg}/${id}`, { headers: authHeaders, redirect: "manual" });
-          const txt = await r.text();
-          if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
-            const parsed = JSON.parse(txt);
-            const unwrapped = parsed?.data ?? parsed;
-            if (r.ok && unwrapped && (unwrapped.id || unwrapped.clientId)) {
-              quoteData = unwrapped;
-              console.log(`[CONVERT-INVOICE] Fetched quote from ${seg}/${id}`);
-              break;
-            }
-          }
-        } catch {
-        }
+      const r = await fetch(`${EXTERNAL_API}/mobile/auth/me`, { headers, redirect: "manual" });
+      const text = await r.text();
+      if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+        return res.status(401).json({ message: "Non authentifi\xE9" });
       }
-      const items = quoteData?.items || quoteData?.lineItems || quoteData?.lines || [];
-      const clientId = quoteData?.clientId || quoteData?.client_id || req.body?.clientId || "";
-      let totalHT = 0;
-      let totalTTC = 0;
-      if (quoteData) {
-        totalHT = parseFloat(String(quoteData.priceExcludingTax || quoteData.totalHT || quoteData.totalExcludingTax || 0)) || 0;
-        totalTTC = parseFloat(String(quoteData.quoteAmount || quoteData.totalTTC || quoteData.total || quoteData.totalAmount || 0)) || 0;
-        if (!totalHT && !totalTTC && items.length > 0) {
-          items.forEach((it) => {
-            const price = parseFloat(String(it.unitPrice || it.price || it.unitPriceExcludingTax || 0)) || 0;
-            const qty = parseFloat(String(it.quantity || 1)) || 1;
-            const tax = parseFloat(String(it.taxRate || it.tvaRate || 0)) || 0;
-            totalHT += qty * price;
-            totalTTC += qty * price * (1 + tax / 100);
-          });
-        }
+      try {
+        return res.status(r.status).json(JSON.parse(text));
+      } catch {
+        return res.status(r.status).send(text);
       }
-      const mappedItems = items.map((it) => {
-        const price = parseFloat(String(it.unitPrice || it.price || it.unitPriceExcludingTax || it.priceExcludingTax || 0)) || 0;
-        const qty = parseFloat(String(it.quantity || 1)) || 1;
-        const tax = parseFloat(String(it.taxRate || it.tvaRate || 0)) || 0;
-        return {
-          description: it.description || it.name || "Prestation",
-          quantity: qty,
-          unitPrice: price,
-          unitPriceExcludingTax: price,
-          taxRate: tax,
-          tvaRate: tax,
-          totalExcludingTax: qty * price,
-          totalIncludingTax: qty * price * (1 + tax / 100),
-          totalPrice: qty * price * (1 + tax / 100)
-        };
-      });
-      const invoicePayload = {
-        clientId,
-        quoteId: id,
-        status: "pending",
-        items: mappedItems,
-        lineItems: mappedItems,
-        totalHT: totalHT.toFixed(2),
-        totalTTC: totalTTC.toFixed(2),
-        totalAmount: totalTTC.toFixed(2),
-        amount: totalTTC.toFixed(2),
-        total: totalTTC.toFixed(2),
-        priceExcludingTax: totalHT.toFixed(2),
-        totalExcludingTax: totalHT.toFixed(2),
-        taxAmount: (totalTTC - totalHT).toFixed(2)
-      };
-      const invoiceSegments = ["mobile/admin/invoices", "admin/invoices", "mobile/invoices"];
-      for (const seg of invoiceSegments) {
-        try {
-          const r = await fetch(`${EXTERNAL_API}/${seg}`, {
-            method: "POST",
-            headers: authHeaders,
-            redirect: "manual",
-            body: JSON.stringify(invoicePayload)
-          });
-          const txt = await r.text();
-          if (!txt.includes("<!DOCTYPE") && !txt.includes("<html")) {
-            const parsed = JSON.parse(txt);
-            if (r.status < 500 && parsed) {
-              console.log(`[CONVERT-INVOICE] \u2705 Manual invoice created via ${seg}, status ${r.status}`);
-              return res.status(r.ok ? r.status : 201).json({
-                ...parsed,
-                quoteId: id,
-                clientId,
-                totalHT: totalHT.toFixed(2),
-                totalTTC: totalTTC.toFixed(2),
-                items: mappedItems
-              });
-            }
-          }
-        } catch {
-        }
-      }
-      console.log(`[CONVERT-INVOICE] All invoice creation endpoints failed for quote ${id}`);
-      return res.status(502).json({ success: false, message: "Impossible de cr\xE9er la facture. Veuillez r\xE9essayer." });
     } catch (err) {
-      console.log(`[CONVERT-INVOICE] Fallback error:`, err);
-      return res.status(502).json({ success: false, message: "Erreur lors de la cr\xE9ation de la facture." });
+      return res.status(502).json({ message: "Erreur de connexion" });
     }
   });
-  app2.use("/api/mobile/quotes", async (req, res, next) => {
-    const auth = req.headers["authorization"] || "";
-    if (isReviewerToken(auth)) {
-      const method = req.method;
-      const parts = req.url.split("/").filter(Boolean);
-      const id = parts[0] || "";
-      const action = parts[1] || "";
-      if (method === "PATCH") return res.json({ ...REVIEWER_DEMO_QUOTES[0], ...req.body, id, updatedAt: (/* @__PURE__ */ new Date()).toISOString() });
-      if (method === "DELETE") return res.json({ success: true, message: "Devis supprim\xE9" });
-      if (method === "POST" && action === "convert-to-invoice") {
-        const q = REVIEWER_DEMO_QUOTES.find((q2) => q2.id === id) || REVIEWER_DEMO_QUOTES[0];
-        const newInvoice = {
-          id: "demo-i-new-" + Date.now(),
-          invoiceNumber: "F-0036",
-          clientId: q.clientId,
-          quoteId: q.id,
-          status: "pending",
-          items: q.items,
-          totalHT: "1041.67",
-          totalTTC: q.totalAmount,
-          tvaAmount: "208.33",
-          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-        };
-        return res.status(201).json(newInvoice);
+  app2.post("/api/refresh", async (req, res) => {
+    const headers = {
+      "host": new URL(EXTERNAL_API).host,
+      "content-type": "application/json",
+      "accept": "application/json"
+    };
+    if (req.headers["authorization"]) headers["authorization"] = req.headers["authorization"];
+    if (req.headers["cookie"]) headers["cookie"] = req.headers["cookie"];
+    try {
+      const r = await fetch(`${EXTERNAL_API}/mobile/refresh-token`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(req.body),
+        redirect: "manual"
+      });
+      const text = await r.text();
+      if (text.includes("<!DOCTYPE") || text.includes("<html")) {
+        return res.status(401).json({ message: "Session expir\xE9e" });
       }
-      if (method === "POST" && action === "create-reservation") {
-        const q = REVIEWER_DEMO_QUOTES.find((q2) => q2.id === id) || REVIEWER_DEMO_QUOTES[0];
-        const newReserv = {
-          id: "demo-r-new-" + Date.now(),
-          reference: "RDV-2026-019",
-          clientId: q.clientId,
-          quoteId: q.id,
-          status: "pending",
-          scheduledDate: req.body?.scheduledDate || new Date(Date.now() + 864e5).toISOString(),
-          notes: req.body?.notes || "",
-          createdAt: (/* @__PURE__ */ new Date()).toISOString(),
-          updatedAt: (/* @__PURE__ */ new Date()).toISOString()
-        };
-        return res.status(201).json(newReserv);
+      try {
+        return res.status(r.status).json(JSON.parse(text));
+      } catch {
+        return res.status(r.status).send(text);
       }
-      return next();
+    } catch (err) {
+      return res.status(502).json({ message: "Erreur de connexion" });
     }
-    return mobileCrudProxy(req, res, "mobile/quotes", ["mobile/admin/quotes", "admin/quotes"]);
   });
   app2.use("/api", async (req, res, next) => {
     try {
@@ -1822,6 +1507,63 @@ async function registerRoutes(app2) {
       res.status(502).json({ message: "Erreur de connexion au serveur API" });
     }
   });
+  app2.post("/api/ocr/analyze", async (req, res) => {
+    try {
+      const { imageBase64, mimeType = "image/jpeg", mode = "invoice" } = req.body;
+      if (!imageBase64) return res.status(400).json({ message: "imageBase64 requis" });
+      const { GoogleGenAI } = await import("@google/genai");
+      const ai = new GoogleGenAI({
+        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+        httpOptions: {
+          apiVersion: "",
+          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL
+        }
+      });
+      const systemPrompt = mode === "quote" ? `Tu es un assistant OCR sp\xE9cialis\xE9 dans les devis automobiles fran\xE7ais. Analyse l'image et extrais les informations structur\xE9es. Retourne UNIQUEMENT un JSON valide (sans markdown): {"clientName":"string ou null","clientEmail":"string ou null","vehicleBrand":"string ou null","vehicleModel":"string ou null","vehiclePlate":"string ou null","notes":"string ou null","items":[{"description":"string","quantity":"1","unitPrice":"string","tvaRate":"20"}]}` : `Tu es un assistant OCR sp\xE9cialis\xE9 dans les factures fran\xE7aises. Analyse l'image et extrais les informations structur\xE9es. Retourne UNIQUEMENT un JSON valide (sans markdown): {"clientName":"string ou null","clientEmail":"string ou null","notes":"string ou null","paymentMethod":"cash|wire_transfer|card|sepa|stripe|klarna|alma ou null","items":[{"description":"string","quantity":"1","unitPrice":"string","tvaRate":"20"}]}`;
+      try {
+        const response = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [{
+            role: "user",
+            parts: [
+              { text: systemPrompt },
+              { inlineData: { mimeType, data: imageBase64 } }
+            ]
+          }],
+          config: { temperature: 0.1, maxOutputTokens: 1024 }
+        });
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+        if (text) {
+          const jsonMatch = text.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            try {
+              const parsed = JSON.parse(jsonMatch[0]);
+              console.log(`[OCR] \u2705 Gemini success for ${mode}`);
+              return res.json({ success: true, data: parsed });
+            } catch {
+            }
+          }
+        }
+        console.log(`[OCR] Gemini response invalid: ${text.substring(0, 100)}`);
+      } catch (geminiErr) {
+        console.log(`[OCR] Gemini failed: ${geminiErr.message}`);
+      }
+      console.log(`[OCR] Returning empty fallback for ${mode}`);
+      return res.json({
+        success: true,
+        data: {
+          clientName: null,
+          clientEmail: null,
+          notes: "Document scann\xE9 - remplir les champs manuellement",
+          items: [{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }],
+          ...mode === "quote" && { vehicleBrand: null, vehicleModel: null, vehiclePlate: null }
+        }
+      });
+    } catch (err) {
+      console.error("[OCR] Unexpected error:", err.message);
+      return res.status(500).json({ success: false, message: "Erreur lors de l'analyse OCR" });
+    }
+  });
   const httpServer = createServer(app2);
   return httpServer;
 }
@@ -1877,6 +1619,7 @@ function setupBodyParsing(app2) {
   });
   app2.use(
     express.json({
+      limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       }
@@ -2024,7 +1767,7 @@ function setupErrorHandler(app2) {
   configureExpoAndLanding(app);
   const server = await registerRoutes(app);
   setupErrorHandler(app);
-  const port = process.env.NODE_ENV === "production" ? parseInt(process.env.PORT || "8081", 10) : 5e3;
+  const port = process.env.NODE_ENV === "production" ? parseInt(process.env.PORT || "5000", 10) : 5e3;
   server.listen(
     {
       port,
