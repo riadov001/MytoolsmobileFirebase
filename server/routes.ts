@@ -1512,7 +1512,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       try {
         const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
+          model: "gemini-2.5-flash",
           contents: [{
             role: "user",
             parts: [
