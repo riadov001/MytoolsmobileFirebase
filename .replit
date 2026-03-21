@@ -3,7 +3,7 @@ modules = ["nodejs-22", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["zip"]
+packages = ["zip", "glib"]
 
 [deployment]
 deploymentTarget = "autoscale"
@@ -94,7 +94,7 @@ outputType = "console"
 PORT = "8081"
 
 [userenv.production]
-PORT = "8081"
+PORT = "5000"
 
 [userenv.shared]
 
