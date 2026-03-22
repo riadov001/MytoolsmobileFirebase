@@ -29,13 +29,6 @@ Key features include:
 - Invoice creation is integrated with quotes via a "Générer facture" button in quote detail, requiring photo upload for quotes.
 - Numeric conversion and sanitization of items array for API payloads.
 
-## Deployment Configuration
-- **Port**: Backend runs on port 5000 in production (mapped to external port 80). Development uses 8081 for Expo, 5000 for backend.
-- **Build**: `npm run expo:static:build` (runs Metro bundler via `scripts/build.js` with DevTools disabled) + `npm run server:build` (esbuild).
-- **Run**: `npm run server:prod` (serves static Expo build + API on port 5000).
-- **System deps**: `glib` (required by React Native DevTools binary), `zip`.
-- **Patches**: None (expo-asset patch removed after upgrading to Expo SDK 55 which includes the fix upstream).
-
 ## External Dependencies
 - **Backend API**: `apps.mytoolsgroup.eu` (configurable via `EXTERNAL_API_URL`)
 - **Authentication**: Bearer tokens and cookie sessions managed by the external API.
