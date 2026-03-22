@@ -1,18 +1,37 @@
 import { initializeApp, getApps } from "firebase/app";
 import { initializeAuth, inMemoryPersistence } from "firebase/auth";
 
-export function isFirebaseConfigured(): boolean {
-  return !!(
-    process.env.EXPO_PUBLIC_FIREBASE_API_KEY &&
-    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID &&
-    process.env.EXPO_PUBLIC_FIREBASE_APP_ID
-  );
-}
-
 let firebaseApp: any = null;
 let firebaseAuth: any = null;
+let initAttempted = false;
 
-if (isFirebaseConfigured()) {
+export function isFirebaseConfigured(): boolean {
+  const hasRequired =
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY &&
+    process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID &&
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID;
+
+  if (!hasRequired) return false;
+
+  // Additional validation: API key should not contain template strings
+  const apiKey = process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "";
+  if (apiKey.includes("${") || apiKey.includes("AIzaSy") === false) {
+    return false;
+  }
+
+  return true;
+}
+
+export function getFirebaseAuth() {
+  if (initAttempted) return firebaseAuth;
+
+  initAttempted = true;
+
+  if (!isFirebaseConfigured()) {
+    console.log("[Firebase] Not configured, skipping initialization");
+    return null;
+  }
+
   try {
     const firebaseConfig = {
       apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
@@ -27,11 +46,12 @@ if (isFirebaseConfigured()) {
     firebaseAuth = initializeAuth(firebaseApp, {
       persistence: inMemoryPersistence,
     });
-  } catch (err) {
-    console.warn("[Firebase] Initialization failed:", err);
+
+    return firebaseAuth;
+  } catch (err: any) {
+    console.error("[Firebase] Init failed:", err?.message);
     firebaseApp = null;
     firebaseAuth = null;
+    return null;
   }
 }
-
-export { firebaseApp, firebaseAuth };

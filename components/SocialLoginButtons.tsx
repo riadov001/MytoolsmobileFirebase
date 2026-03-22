@@ -18,7 +18,7 @@ import {
   OAuthProvider,
 } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
-import { firebaseAuth as fbAuth, isFirebaseConfigured } from "@/lib/firebase";
+import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { useTheme } from "@/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -74,6 +74,7 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleGoogleResponse = async (googleIdToken?: string | null, accessToken?: string | null) => {
     if (!googleIdToken && !accessToken) { setLoading(null); return; }
     try {
+      const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = GoogleAuthProvider.credential(googleIdToken, accessToken);
       const result = await signInWithCredential(fbAuth, credential);
@@ -89,6 +90,7 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleFacebookResponse = async (fbAccessToken?: string | null) => {
     if (!fbAccessToken) { setLoading(null); return; }
     try {
+      const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = FacebookAuthProvider.credential(fbAccessToken);
       const result = await signInWithCredential(fbAuth, credential);
@@ -122,6 +124,7 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
     }
     setLoading("apple");
     try {
+      const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
       
       const appleCredential = await AppleAuthentication.signInAsync({
