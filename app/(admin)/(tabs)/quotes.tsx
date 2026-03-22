@@ -263,7 +263,17 @@ export default function AdminQuotesScreen() {
       <View style={[styles.header, { paddingTop: topPad }]}>
         <Image source={require("@/assets/images/logo_new.png")} style={styles.headerLogo} contentFit="contain" />
         <Text style={styles.screenTitle}>Devis</Text>
-        <View style={{ width: 44 }} />
+        {isAdmin ? (
+          <Pressable
+            style={styles.addBtn}
+            onPress={() => router.push("/(admin)/quote-create" as any)}
+            accessibilityLabel="Nouveau devis"
+          >
+            <Ionicons name="add" size={22} color={theme.primary} />
+          </Pressable>
+        ) : (
+          <View style={{ width: 44 }} />
+        )}
       </View>
 
       <View style={styles.searchRow}>
@@ -317,21 +327,6 @@ export default function AdminQuotesScreen() {
         />
       )}
       {AlertComponent}
-      {isAdmin && (
-        <View style={StyleSheet.absoluteFillObject} pointerEvents="box-none">
-          <Pressable
-            style={({ pressed }) => [
-              styles.fab,
-              { bottom: Platform.OS === "web" ? 34 + 130 : insets.bottom + 130 },
-              pressed && styles.fabPressed,
-            ]}
-            onPress={() => router.push("/(admin)/quote-create" as any)}
-            accessibilityLabel="Nouveau devis"
-          >
-            <Ionicons name="add" size={26} color="#fff" />
-          </Pressable>
-        </View>
-      )}
       <FloatingSupport />
     </View>
   );
@@ -351,49 +346,32 @@ function ActionBtn({ icon, color, label, onPress }: { icon: any; color: string; 
 
 const getStyles = (theme: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 20, paddingBottom: 14 },
-  headerLogo: { width: 36, height: 36, borderRadius: 10 },
+  header: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingBottom: 12 },
+  headerLogo: { width: 34, height: 34, borderRadius: 8 },
   screenTitle: { flex: 1, fontSize: 22, fontFamily: "Michroma_400Regular", color: theme.text, letterSpacing: 0.5 },
-  fab: {
-    position: "absolute", right: 20, width: 58, height: 58, borderRadius: 29,
-    backgroundColor: theme.primary, justifyContent: "center", alignItems: "center",
-    ...Platform.select({
-      web: { boxShadow: "0px 6px 16px rgba(0,0,0,0.22)" } as any,
-      default: { shadowColor: theme.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10 },
-    }),
-    zIndex: 100,
-  },
-  fabPressed: { backgroundColor: theme.primaryDark, transform: [{ scale: 0.92 }] },
-  searchRow: { paddingHorizontal: 20, marginBottom: 12 },
-  searchBox: {
-    flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: theme.surface,
-    borderRadius: 14, borderWidth: 1.5, borderColor: theme.border, paddingHorizontal: 14, height: 48,
-    shadowColor: theme.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  searchInput: { flex: 1, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text },
-  filterRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 12, flexDirection: "row" },
+  addBtn: { width: 44, height: 44, justifyContent: "center", alignItems: "center", borderRadius: 12, backgroundColor: theme.primary + "15" },
+  searchRow: { paddingHorizontal: 16, marginBottom: 12 },
+  searchBox: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: theme.surface, borderRadius: 12, borderWidth: 1, borderColor: theme.border, paddingHorizontal: 12, height: 44 },
+  searchInput: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: theme.text },
+  filterRow: { paddingHorizontal: 16, gap: 8, paddingBottom: 12, flexDirection: "row" },
   center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  card: {
-    flexDirection: "row", backgroundColor: theme.surface, borderRadius: 16, borderWidth: 1,
-    borderColor: theme.border, marginBottom: 10, overflow: "hidden",
-    shadowColor: theme.shadow, shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
-  },
+  card: { flexDirection: "row", backgroundColor: theme.surface, borderRadius: 14, borderWidth: 1, borderColor: theme.border, marginBottom: 10, overflow: "hidden" },
   cardAccent: { width: 4 },
-  cardBody: { flex: 1, padding: 16, gap: 10 },
+  cardBody: { flex: 1, padding: 14, gap: 8 },
   cardTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" },
   cardLeft: { flex: 1, marginRight: 8 },
-  cardTitle: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: theme.text },
-  cardRef: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: theme.primary, marginTop: 3 },
+  cardTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: theme.text },
+  cardRef: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.primary, marginTop: 2 },
   contactRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  contactItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  contactItem: { flexDirection: "row", alignItems: "center", gap: 4 },
   contactText: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textSecondary },
   cardServices: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary },
-  badge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 10 },
-  badgeText: { fontSize: 11, fontFamily: "Inter_700Bold" },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+  badgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold" },
   cardBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  cardAmount: { fontSize: 17, fontFamily: "Inter_700Bold", color: theme.text },
-  cardDate: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textTertiary },
-  cardActions: { flexDirection: "row", gap: 8, justifyContent: "flex-end", borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 10, marginTop: 2 },
-  empty: { alignItems: "center", paddingTop: 60, gap: 14 },
-  emptyText: { fontSize: 15, fontFamily: "Inter_400Regular", color: theme.textTertiary },
+  cardAmount: { fontSize: 16, fontFamily: "Inter_700Bold", color: theme.text },
+  cardDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: theme.textTertiary },
+  cardActions: { flexDirection: "row", gap: 8, justifyContent: "flex-end", borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 8, marginTop: 2 },
+  empty: { alignItems: "center", paddingTop: 60, gap: 12 },
+  emptyText: { fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textTertiary },
 });

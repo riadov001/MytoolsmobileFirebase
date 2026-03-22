@@ -71,7 +71,6 @@ function setupBodyParsing(app: express.Application) {
 
   app.use(
     express.json({
-      limit: "10mb",
       verify: (req, _res, buf) => {
         req.rawBody = buf;
       },
@@ -274,7 +273,7 @@ function setupErrorHandler(app: express.Application) {
   setupErrorHandler(app);
 
   const port = process.env.NODE_ENV === "production"
-    ? parseInt(process.env.PORT || "5000", 10)
+    ? parseInt(process.env.PORT || "8081", 10)
     : 5000;
   server.listen(
     {

@@ -1497,51 +1497,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { imageBase64, mimeType = "image/jpeg", mode = "invoice" } = req.body;
       if (!imageBase64) return res.status(400).json({ message: "imageBase64 requis" });
 
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({
-        apiKey: process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
-        httpOptions: {
-          apiVersion: "",
-          baseUrl: process.env.AI_INTEGRATIONS_GEMINI_BASE_URL,
-        },
-      });
+      const geminiBaseUrl = process.env.AI_INTEGRATIONS_GEMINI_BASE_URL || "http://localhost:1106/modelfarm/gemini";
+      const geminiKey = process.env.AI_INTEGRATIONS_GEMINI_API_KEY || "";
 
       const systemPrompt = mode === "quote"
         ? `Tu es un assistant OCR spécialisé dans les devis automobiles français. Analyse l'image et extrais les informations structurées. Retourne UNIQUEMENT un JSON valide (sans markdown): {"clientName":"string ou null","clientEmail":"string ou null","vehicleBrand":"string ou null","vehicleModel":"string ou null","vehiclePlate":"string ou null","notes":"string ou null","items":[{"description":"string","quantity":"1","unitPrice":"string","tvaRate":"20"}]}`
         : `Tu es un assistant OCR spécialisé dans les factures françaises. Analyse l'image et extrais les informations structurées. Retourne UNIQUEMENT un JSON valide (sans markdown): {"clientName":"string ou null","clientEmail":"string ou null","notes":"string ou null","paymentMethod":"cash|wire_transfer|card|sepa|stripe|klarna|alma ou null","items":[{"description":"string","quantity":"1","unitPrice":"string","tvaRate":"20"}]}`;
 
       try {
-        const response = await ai.models.generateContent({
-          model: "gemini-2.0-flash",
+        const payload = {
           contents: [{
-            role: "user",
             parts: [
               { text: systemPrompt },
-              { inlineData: { mimeType, data: imageBase64 } },
-            ],
+              { inline_data: { mime_type: mimeType, data: imageBase64 } }
+            ]
           }],
-          config: { temperature: 0.1, maxOutputTokens: 1024 },
+          generationConfig: { temperature: 0.1, maxOutputTokens: 1024 }
+        };
+
+        const geminiRes = await fetch(`${geminiBaseUrl}/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(10000),
         });
 
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
-        if (text) {
-          const jsonMatch = text.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            try {
-              const parsed = JSON.parse(jsonMatch[0]);
-              console.log(`[OCR] ✅ Gemini success for ${mode}`);
-              return res.json({ success: true, data: parsed });
-            } catch {}
+        if (geminiRes.ok) {
+          const geminiData = await geminiRes.json() as any;
+          const text = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (text) {
+            const jsonMatch = text.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+              try {
+                const parsed = JSON.parse(jsonMatch[0]);
+                console.log(`[OCR] ✅ Gemini success for ${mode}`);
+                return res.json({ success: true, data: parsed });
+              } catch {}
+            }
           }
+          console.log(`[OCR] Gemini response invalid: ${text.substring(0, 100)}`);
+        } else {
+          console.log(`[OCR] Gemini status ${geminiRes.status}`);
         }
-        console.log(`[OCR] Gemini response invalid: ${text.substring(0, 100)}`);
       } catch (geminiErr: any) {
         console.log(`[OCR] Gemini failed: ${geminiErr.message}`);
       }
 
       console.log(`[OCR] Returning empty fallback for ${mode}`);
-      return res.json({
-        success: true,
+      return res.json({ 
+        success: true, 
         data: {
           clientName: null,
           clientEmail: null,
