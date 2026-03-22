@@ -1,20 +1,6 @@
 import { initializeApp, getApps } from "firebase/app";
 import { initializeAuth, inMemoryPersistence } from "firebase/auth";
 
-const firebaseConfig = {
-  apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || "",
-  authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
-  projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || "",
-  appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || "",
-};
-
-const firebaseApp =
-  getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-
-export const firebaseAuth = initializeAuth(firebaseApp, {
-  persistence: inMemoryPersistence,
-});
-
 export function isFirebaseConfigured(): boolean {
   return !!(
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY &&
@@ -22,3 +8,30 @@ export function isFirebaseConfigured(): boolean {
     process.env.EXPO_PUBLIC_FIREBASE_APP_ID
   );
 }
+
+let firebaseApp: any = null;
+let firebaseAuth: any = null;
+
+if (isFirebaseConfigured()) {
+  try {
+    const firebaseConfig = {
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || "",
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    firebaseApp =
+      getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+
+    firebaseAuth = initializeAuth(firebaseApp, {
+      persistence: inMemoryPersistence,
+    });
+  } catch (err) {
+    console.warn("[Firebase] Initialization failed:", err);
+    firebaseApp = null;
+    firebaseAuth = null;
+  }
+}
+
+export { firebaseApp, firebaseAuth };

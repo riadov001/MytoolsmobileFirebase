@@ -18,7 +18,7 @@ import {
   OAuthProvider,
 } from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
-import { firebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
+import { firebaseAuth as fbAuth, isFirebaseConfigured } from "@/lib/firebase";
 import { useTheme } from "@/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -74,8 +74,9 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleGoogleResponse = async (googleIdToken?: string | null, accessToken?: string | null) => {
     if (!googleIdToken && !accessToken) { setLoading(null); return; }
     try {
+      if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = GoogleAuthProvider.credential(googleIdToken, accessToken);
-      const result = await signInWithCredential(firebaseAuth, credential);
+      const result = await signInWithCredential(fbAuth, credential);
       const firebaseIdToken = await result.user.getIdToken();
       await onIdToken(firebaseIdToken, "google");
     } catch (err: any) {
@@ -88,8 +89,9 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleFacebookResponse = async (fbAccessToken?: string | null) => {
     if (!fbAccessToken) { setLoading(null); return; }
     try {
+      if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = FacebookAuthProvider.credential(fbAccessToken);
-      const result = await signInWithCredential(firebaseAuth, credential);
+      const result = await signInWithCredential(fbAuth, credential);
       const firebaseIdToken = await result.user.getIdToken();
       await onIdToken(firebaseIdToken, "facebook");
     } catch (err: any) {
@@ -120,6 +122,8 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
     }
     setLoading("apple");
     try {
+      if (!fbAuth) throw new Error("Firebase non configuré");
+      
       const appleCredential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
@@ -133,9 +137,9 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
       const firebaseCredential = provider.credential({
         idToken: appleCredential.identityToken,
       });
-      const result = await signInWithCredential(firebaseAuth, firebaseCredential);
-      const idToken = await result.user.getIdToken();
-      await onIdToken(idToken, "apple");
+      const result = await signInWithCredential(fbAuth, firebaseCredential);
+      const appleIdToken = await result.user.getIdToken();
+      await onIdToken(appleIdToken, "apple");
     } catch (err: any) {
       if (err?.code !== "ERR_REQUEST_CANCELED") {
         onError(err?.message || "Erreur Apple Sign-In");
