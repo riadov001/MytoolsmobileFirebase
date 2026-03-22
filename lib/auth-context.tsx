@@ -34,6 +34,21 @@ function detectIsEmployee(user: any): boolean {
   return false;
 }
 
+interface SocialUserProfile {
+  id: number;
+  uid: string;
+  email: string | null;
+  name: string | null;
+  provider: string;
+  role: string;
+  onboarding_completed: boolean;
+}
+
+interface SocialLoginResult {
+  user: SocialUserProfile;
+  isNewUser: boolean;
+}
+
 interface AuthContextValue {
   user: UserProfile | null;
   isLoading: boolean;
@@ -47,6 +62,7 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   biometricLogin: () => Promise<boolean>;
+  socialLogin: (idToken: string, provider: string) => Promise<SocialLoginResult>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -140,6 +156,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
+      const socialToken = await getToken("social_access_token");
+      if (socialToken) {
+        try {
+          const parts = socialToken.split(".");
+          if (parts.length === 3) {
+            const payload = JSON.parse(atob(parts[1]));
+            const now = Math.floor(Date.now() / 1000);
+            if (payload.exp && payload.exp > now && payload.uid) {
+              setStoredAccessToken(socialToken);
+              setUser(payload as any);
+              setIsLoading(false);
+              return;
+            }
+          }
+        } catch {
+          await removeToken("social_access_token");
+        }
+      }
+
       const savedAccessToken = await getToken("access_token");
       const savedRefreshToken = await getToken("refresh_token");
 
@@ -247,6 +282,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await removeToken("session_cookie");
     await removeToken("access_token");
     await removeToken("refresh_token");
+    await removeToken("social_access_token");
     setSessionCookie(null);
   };
 
@@ -263,6 +299,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const userData = await authApi.getUser();
       setUser(userData);
     } catch {}
+  };
+
+  const socialLogin = async (idToken: string, provider: string): Promise<SocialLoginResult> => {
+    const apiBase = (() => {
+      if (Platform.OS === "web" && typeof window !== "undefined") {
+        const origin = window.location.origin;
+        if (origin.includes("localhost:8081") || origin.includes("127.0.0.1:8081")) {
+          return origin.replace(/:8081\b/, ":5000");
+        }
+        return origin;
+      }
+      if (process.env.EXPO_PUBLIC_DOMAIN) return `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
+      return "https://saas3.mytoolsgroup.eu";
+    })();
+
+    const res = await fetch(`${apiBase}/api/auth/social`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: idToken, provider }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.message || "Authentification sociale échouée");
+    }
+
+    const data = await res.json();
+    await storeToken("social_access_token", data.token);
+    setStoredAccessToken(data.token);
+
+    const socialUser = data.user as SocialUserProfile;
+    setUser(socialUser as any);
+
+    return { user: socialUser, isNewUser: data.isNewUser };
   };
 
   const biometricLogin = async (): Promise<boolean> => {
@@ -338,6 +408,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       refreshUser,
       biometricLogin,
+      socialLogin,
     }),
     [user, isLoading, storedAccessToken]
   );

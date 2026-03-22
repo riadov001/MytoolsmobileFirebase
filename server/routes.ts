@@ -4,6 +4,7 @@ import pg from "pg";
 import path from "node:path";
 import fs from "node:fs";
 import Busboy from "busboy";
+import { registerSocialAuthRoutes } from "./social-auth";
 
 const EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
 console.log(`[CONFIG] External API: ${EXTERNAL_API}`);
@@ -1544,6 +1545,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(502).json({ message: "Erreur de connexion" });
     }
   });
+
+  registerSocialAuthRoutes(app);
 
   app.use("/api", async (req: Request, res: Response, next: NextFunction) => {
     try {

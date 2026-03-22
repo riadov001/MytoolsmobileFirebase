@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
+import { SocialLoginButtons } from "@/components/SocialLoginButtons";
 
 let LocalAuthentication: any = null;
 if (Platform.OS !== "web") {
@@ -28,7 +29,7 @@ if (Platform.OS !== "web") {
 
 export default function LoginScreen() {
   const insets = useSafeAreaInsets();
-  const { login, biometricLogin } = useAuth();
+  const { login, biometricLogin, socialLogin } = useAuth();
   const { showAlert, AlertComponent } = useCustomAlert();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
@@ -89,6 +90,29 @@ export default function LoginScreen() {
         setLoading(false);
       }
     } catch { setLoading(false); }
+  };
+
+  const handleSocialLogin = async (idToken: string, provider: string) => {
+    setLoading(true);
+    try {
+      const result = await socialLogin(idToken, provider);
+      const onboardingDone =
+        result.user.onboarding_completed && !result.isNewUser;
+
+      if (onboardingDone) {
+        setTimeout(() => router.replace("/(main)" as any), 100);
+      } else {
+        setTimeout(() => router.replace("/onboarding" as any), 100);
+      }
+    } catch (err: any) {
+      showAlert({
+        type: "error",
+        title: "Erreur de connexion",
+        message: err.message || "Authentification sociale échouée.",
+        buttons: [{ text: "OK", style: "primary" }],
+      });
+      setLoading(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -208,6 +232,18 @@ export default function LoginScreen() {
               <Text style={styles.biometricBtnText}>Se connecter avec {biometricType}</Text>
             </Pressable>
           )}
+
+          <SocialLoginButtons
+            onIdToken={handleSocialLogin}
+            onError={(msg) =>
+              showAlert({
+                type: "error",
+                title: "Erreur",
+                message: msg,
+                buttons: [{ text: "OK", style: "primary" }],
+              })
+            }
+          />
 
           <View style={styles.accessInfoBox}>
             <Ionicons name="lock-closed-outline" size={14} color="#666" />

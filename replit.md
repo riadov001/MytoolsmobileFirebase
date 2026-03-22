@@ -10,6 +10,36 @@ This is a mobile application built with Expo React Native, exclusively for admin
 - Font: Inter (Google Fonts)
 - Logo: cropped-Logo-2-1-768x543 intégré dans l'app
 
+## Social Authentication (Firebase)
+
+Added social login with Google, Apple (iOS), Facebook, and Twitter/X. Uses Firebase Auth JS SDK on the frontend and validates Firebase ID tokens via Firebase REST API on the backend.
+
+### New files
+- `lib/firebase.ts` — Firebase app + auth initialization (inMemoryPersistence)
+- `components/SocialLoginButtons.tsx` — Social login UI (expo-auth-session + expo-apple-authentication)
+- `server/social-auth.ts` — Backend routes: `POST /api/auth/social`, `POST /api/auth/social/onboarding-complete`
+
+### New DB table: `social_users`
+Stores social auth users locally with onboarding status.
+
+### Required environment variables
+**Frontend (EXPO_PUBLIC_*):**
+- `EXPO_PUBLIC_FIREBASE_API_KEY`
+- `EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN`
+- `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
+- `EXPO_PUBLIC_FIREBASE_APP_ID`
+- `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
+- `EXPO_PUBLIC_FACEBOOK_APP_ID`
+- `EXPO_PUBLIC_TWITTER_CLIENT_ID`
+
+**Backend:**
+- `FIREBASE_WEB_API_KEY` (same value as EXPO_PUBLIC_FIREBASE_API_KEY)
+- `SOCIAL_JWT_SECRET` (secret for signing social auth JWTs)
+
+### Navigation after social login
+- New user or onboarding not completed → `/onboarding`
+- Returning user with onboarding done → `/(main)`
+
 ## System Architecture
 The application is built using Expo React Native with file-based routing via Expo Router for the frontend. It consumes an external API hosted on `saas3.mytoolsgroup.eu`. Authentication is handled via a dual system: Bearer tokens for admin API calls and cookie sessions for client-side interactions. State management utilizes React Query for server data and React Context for authentication.
 
