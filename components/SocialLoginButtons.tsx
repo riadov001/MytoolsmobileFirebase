@@ -8,22 +8,14 @@ import {
   Platform,
 } from "react-native";
 import * as WebBrowser from "expo-web-browser";
-import * as Google from "expo-auth-session/providers/google";
-import * as Facebook from "expo-auth-session/providers/facebook";
 import { makeRedirectUri } from "expo-auth-session";
-import {
-  signInWithCredential,
-  GoogleAuthProvider,
-  FacebookAuthProvider,
-  OAuthProvider,
-} from "firebase/auth";
 import { Ionicons } from "@expo/vector-icons";
-import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase";
+import { isFirebaseConfigured } from "@/lib/firebase";
 import { useTheme } from "@/lib/theme";
 
 WebBrowser.maybeCompleteAuthSession();
 
-interface SocialLoginButtonsProps {
+export interface SocialLoginButtonsProps {
   onIdToken: (idToken: string, provider: string) => Promise<void>;
   onError: (message: string) => void;
 }
@@ -35,20 +27,25 @@ if (Platform.OS === "ios") {
   } catch {}
 }
 
-export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsProps) {
-  const theme = useTheme();
+// ── Inner component: hooks only run when Firebase IS configured ──────────────
+function SocialLoginButtonsInner({ onIdToken, onError }: SocialLoginButtonsProps) {
   const [loading, setLoading] = useState<string | null>(null);
+
+  // Lazy-load expo-auth-session providers so hooks are always called in the
+  // same order, but only when this component (inner) is actually mounted.
+  const Google = require("expo-auth-session/providers/google");
+  const Facebook = require("expo-auth-session/providers/facebook");
 
   const redirectUri = makeRedirectUri({ scheme: "mytools", path: "auth/callback" });
 
-  const [googleRequest, googleResponse, googlePromptAsync] = Google.useAuthRequest({
-    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  const [, googleResponse, googlePromptAsync] = Google.useAuthRequest({
+    webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "placeholder",
+    expoClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "placeholder",
     redirectUri,
   });
 
-  const [fbRequest, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
-    clientId: process.env.EXPO_PUBLIC_FACEBOOK_APP_ID,
+  const [, fbResponse, fbPromptAsync] = Facebook.useAuthRequest({
+    clientId: process.env.EXPO_PUBLIC_FACEBOOK_APP_ID || "placeholder",
     redirectUri,
   });
 
@@ -74,12 +71,13 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleGoogleResponse = async (googleIdToken?: string | null, accessToken?: string | null) => {
     if (!googleIdToken && !accessToken) { setLoading(null); return; }
     try {
+      const { getFirebaseAuth } = require("@/lib/firebase");
+      const { signInWithCredential, GoogleAuthProvider } = await import("firebase/auth");
       const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = GoogleAuthProvider.credential(googleIdToken, accessToken);
       const result = await signInWithCredential(fbAuth, credential);
-      const firebaseIdToken = await result.user.getIdToken();
-      await onIdToken(firebaseIdToken, "google");
+      await onIdToken(await result.user.getIdToken(), "google");
     } catch (err: any) {
       onError(err?.message || "Erreur Google Sign-In");
     } finally {
@@ -90,12 +88,13 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   const handleFacebookResponse = async (fbAccessToken?: string | null) => {
     if (!fbAccessToken) { setLoading(null); return; }
     try {
+      const { getFirebaseAuth } = require("@/lib/firebase");
+      const { signInWithCredential, FacebookAuthProvider } = await import("firebase/auth");
       const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
       const credential = FacebookAuthProvider.credential(fbAccessToken);
       const result = await signInWithCredential(fbAuth, credential);
-      const firebaseIdToken = await result.user.getIdToken();
-      await onIdToken(firebaseIdToken, "facebook");
+      await onIdToken(await result.user.getIdToken(), "facebook");
     } catch (err: any) {
       onError(err?.message || "Erreur Facebook Sign-In");
     } finally {
@@ -105,13 +104,11 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
 
   const handleGoogle = async () => {
     if (!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID) {
-      onError("Google Sign-In non configuré. Ajoutez EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID.");
+      onError("Google Sign-In non configuré (EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID manquant).");
       return;
     }
     setLoading("google");
-    try {
-      await googlePromptAsync();
-    } catch (err: any) {
+    try { await googlePromptAsync(); } catch (err: any) {
       onError(err?.message || "Erreur Google");
       setLoading(null);
     }
@@ -124,25 +121,23 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
     }
     setLoading("apple");
     try {
+      const { getFirebaseAuth } = require("@/lib/firebase");
+      const { signInWithCredential, OAuthProvider } = await import("firebase/auth");
       const fbAuth = getFirebaseAuth();
       if (!fbAuth) throw new Error("Firebase non configuré");
-      
+
       const appleCredential = await AppleAuthentication.signInAsync({
         requestedScopes: [
           AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
           AppleAuthentication.AppleAuthenticationScope.EMAIL,
         ],
       });
-
       if (!appleCredential.identityToken) throw new Error("Aucun token Apple reçu");
 
       const provider = new OAuthProvider("apple.com");
-      const firebaseCredential = provider.credential({
-        idToken: appleCredential.identityToken,
-      });
+      const firebaseCredential = provider.credential({ idToken: appleCredential.identityToken });
       const result = await signInWithCredential(fbAuth, firebaseCredential);
-      const appleIdToken = await result.user.getIdToken();
-      await onIdToken(appleIdToken, "apple");
+      await onIdToken(await result.user.getIdToken(), "apple");
     } catch (err: any) {
       if (err?.code !== "ERR_REQUEST_CANCELED") {
         onError(err?.message || "Erreur Apple Sign-In");
@@ -154,13 +149,11 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
 
   const handleFacebook = async () => {
     if (!process.env.EXPO_PUBLIC_FACEBOOK_APP_ID) {
-      onError("Facebook Sign-In non configuré. Ajoutez EXPO_PUBLIC_FACEBOOK_APP_ID.");
+      onError("Facebook Sign-In non configuré (EXPO_PUBLIC_FACEBOOK_APP_ID manquant).");
       return;
     }
     setLoading("facebook");
-    try {
-      await fbPromptAsync();
-    } catch (err: any) {
+    try { await fbPromptAsync(); } catch (err: any) {
       onError(err?.message || "Erreur Facebook");
       setLoading(null);
     }
@@ -168,7 +161,7 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
 
   const handleTwitter = async () => {
     if (!process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID) {
-      onError("Twitter Sign-In non configuré. Ajoutez EXPO_PUBLIC_TWITTER_CLIENT_ID.");
+      onError("Twitter Sign-In non configuré (EXPO_PUBLIC_TWITTER_CLIENT_ID manquant).");
       return;
     }
     setLoading("twitter");
@@ -176,24 +169,16 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
       const { startAsync } = await import("expo-auth-session");
       const twitterRedirect = makeRedirectUri({ scheme: "mytools", path: "auth/twitter" });
       const state = Math.random().toString(36).slice(2);
-
-      const result = await startAsync({
+      const result = await (startAsync as any)({
         authUrl:
-          `https://twitter.com/i/oauth2/authorize` +
-          `?response_type=code` +
+          `https://twitter.com/i/oauth2/authorize?response_type=code` +
           `&client_id=${process.env.EXPO_PUBLIC_TWITTER_CLIENT_ID}` +
           `&redirect_uri=${encodeURIComponent(twitterRedirect)}` +
           `&scope=tweet.read%20users.read%20offline.access` +
-          `&state=${state}` +
-          `&code_challenge=challenge` +
-          `&code_challenge_method=plain`,
-      } as any);
-
-      if ((result as any).type === "success") {
-        const code = (result as any).params?.code;
-        if (code) {
-          await onIdToken(code, "twitter");
-        }
+          `&state=${state}&code_challenge=challenge&code_challenge_method=plain`,
+      });
+      if (result?.type === "success" && result.params?.code) {
+        await onIdToken(result.params.code, "twitter");
       }
     } catch (err: any) {
       onError(err?.message || "Erreur Twitter Sign-In");
@@ -202,45 +187,14 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
     }
   };
 
-  const configured = isFirebaseConfigured();
-
   const buttons = [
-    {
-      key: "google",
-      label: "Google",
-      icon: "logo-google" as const,
-      color: "#4285F4",
-      onPress: handleGoogle,
-    },
+    { key: "google", label: "Google", icon: "logo-google" as const, color: "#4285F4", onPress: handleGoogle },
     ...(Platform.OS === "ios"
-      ? [{ key: "apple", label: "Apple", icon: "logo-apple" as const, color: "#000", onPress: handleApple }]
+      ? [{ key: "apple", label: "Apple", icon: "logo-apple" as const, color: "#fff", onPress: handleApple }]
       : []),
-    {
-      key: "facebook",
-      label: "Facebook",
-      icon: "logo-facebook" as const,
-      color: "#1877F2",
-      onPress: handleFacebook,
-    },
-    {
-      key: "twitter",
-      label: "Twitter / X",
-      icon: "logo-twitter" as const,
-      color: "#1DA1F2",
-      onPress: handleTwitter,
-    },
+    { key: "facebook", label: "Facebook", icon: "logo-facebook" as const, color: "#1877F2", onPress: handleFacebook },
+    { key: "twitter", label: "Twitter / X", icon: "logo-twitter" as const, color: "#1DA1F2", onPress: handleTwitter },
   ];
-
-  if (!configured) {
-    return (
-      <View style={styles.notConfigured}>
-        <Ionicons name="information-circle-outline" size={14} color="#888" />
-        <Text style={styles.notConfiguredText}>
-          Authentification sociale non configurée (Firebase requis)
-        </Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -249,7 +203,6 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
         <Text style={styles.dividerText}>ou continuer avec</Text>
         <View style={styles.dividerLine} />
       </View>
-
       <View style={styles.buttonsGrid}>
         {buttons.map((btn) => (
           <Pressable
@@ -276,6 +229,21 @@ export function SocialLoginButtons({ onIdToken, onError }: SocialLoginButtonsPro
   );
 }
 
+// ── Outer component: guard — no hooks from providers run if not configured ──
+export function SocialLoginButtons(props: SocialLoginButtonsProps) {
+  if (!isFirebaseConfigured()) {
+    return (
+      <View style={styles.notConfigured}>
+        <Ionicons name="information-circle-outline" size={14} color="#888" />
+        <Text style={styles.notConfiguredText}>
+          Connexion sociale non configurée (Firebase requis)
+        </Text>
+      </View>
+    );
+  }
+  return <SocialLoginButtonsInner {...props} />;
+}
+
 const styles = StyleSheet.create({
   container: { marginTop: 4 },
   dividerRow: {
@@ -284,11 +252,7 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     gap: 10,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "rgba(255,255,255,0.1)",
-  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.1)" },
   dividerText: {
     fontSize: 11,
     color: "#666",
@@ -315,17 +279,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
   },
-  socialBtnPressed: {
-    opacity: 0.75,
-    backgroundColor: "rgba(255,255,255,0.08)",
-  },
-  socialBtnLoading: {
-    opacity: 0.6,
-  },
-  socialBtnText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-  },
+  socialBtnPressed: { opacity: 0.75, backgroundColor: "rgba(255,255,255,0.08)" },
+  socialBtnLoading: { opacity: 0.6 },
+  socialBtnText: { fontSize: 13, fontFamily: "Inter_500Medium" },
   notConfigured: {
     flexDirection: "row",
     alignItems: "center",
