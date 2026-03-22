@@ -9,6 +9,16 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCCjrfHzHimlgfPjJbrWdGME_AV7jh-gdc",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:129808585113:web:089c2bf99d833a519b4308",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "crud-ae9d9.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "crud-ae9d9",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "crud-ae9d9.firebasestorage.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "129808585113-u2ql0k5vo7ih8oo06b3g9cc3qjj1g4v8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "129808585113-q81uhog8n2eivfpgg924tdfrh3s3ifau.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "620744025416-3uq2eou0n3b5kiubn2qas6ndivl5lf0p.apps.googleusercontent.com"
       }
     },
     "preview": {
@@ -18,6 +28,16 @@
       },
       "ios": {
         "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCCjrfHzHimlgfPjJbrWdGME_AV7jh-gdc",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:129808585113:web:089c2bf99d833a519b4308",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "crud-ae9d9.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "crud-ae9d9",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "crud-ae9d9.firebasestorage.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "129808585113-u2ql0k5vo7ih8oo06b3g9cc3qjj1g4v8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "129808585113-q81uhog8n2eivfpgg924tdfrh3s3ifau.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "620744025416-3uq2eou0n3b5kiubn2qas6ndivl5lf0p.apps.googleusercontent.com"
       }
     },
     "production": {
@@ -28,6 +48,16 @@
       },
       "ios": {
         "simulator": false
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyCCjrfHzHimlgfPjJbrWdGME_AV7jh-gdc",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:129808585113:web:089c2bf99d833a519b4308",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "crud-ae9d9.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "crud-ae9d9",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "crud-ae9d9.firebasestorage.app",
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "129808585113-u2ql0k5vo7ih8oo06b3g9cc3qjj1g4v8.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID": "129808585113-q81uhog8n2eivfpgg924tdfrh3s3ifau.apps.googleusercontent.com",
+        "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "620744025416-3uq2eou0n3b5kiubn2qas6ndivl5lf0p.apps.googleusercontent.com"
       }
     }
   },
@@ -42,7 +72,7 @@
       "ios": {
         "appleId": "your@apple.email",
         "ascAppId": "YOUR_ASC_APP_ID",
-        "appleTeamId": "YOUR_TEAM_ID"
+        "appleTeamId": "GP593F562X"
       }
     }
   }
