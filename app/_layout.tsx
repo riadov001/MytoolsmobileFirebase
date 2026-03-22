@@ -1,3 +1,16 @@
+// Load DEV_SECRETS_KEYS JSON config for development
+if (typeof window !== "undefined") {
+  try {
+    const secretsJson = process.env.DEV_SECRETS_KEYS || "{}";
+    const secrets = JSON.parse(secretsJson);
+    process.env.EXPO_PUBLIC_FIREBASE_API_KEY = secrets.EXPO_PUBLIC_FIREBASE_API_KEY || secrets.GOOGLE_API_KEY_2 || "";
+    process.env.EXPO_PUBLIC_FIREBASE_APP_ID = secrets.EXPO_PUBLIC_FIREBASE_APP_ID || "";
+    process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || "";
+  } catch (e) {
+    // Ignore parse errors
+  }
+}
+
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";

@@ -1,3 +1,6 @@
+// Load DEV_SECRETS_KEYS JSON config for development
+require("../parse-dev-secrets.js");
+
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
