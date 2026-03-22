@@ -1056,8 +1056,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
-  app.post("/api/admin/:docType(quotes|invoices)/:docId/media", async (req: Request, res: Response) => {
-    const { docType, docId } = req.params;
+  app.post("/api/admin/quotes/:docId/media", handleMediaUpload("quotes"));
+  app.post("/api/admin/invoices/:docId/media", handleMediaUpload("invoices"));
+
+  function handleMediaUpload(docType: string) {
+    return async (req: Request, res: Response) => {
+    const docId = req.params.docId;
     const type = docType === "quotes" ? "quote" : "invoice";
     const rawBody = (req as any).rawBody as Buffer;
     const ct = req.headers["content-type"] || "";
@@ -1113,7 +1117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     return res.json({ success: true, photos: savedUrls });
-  });
+    };
+  }
 
   app.use("/api/admin", async (req: Request, res: Response, next: NextFunction) => {
     try {
