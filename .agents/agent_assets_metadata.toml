@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "HpseUi7McbVRyBNINmWlV"
+uri = "file://CHANGES_SINCE_LAST_PUBLISH.md"
+type = "text"
+title = "Changes Since Last Publish"
