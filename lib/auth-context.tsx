@@ -34,20 +34,21 @@ function detectIsEmployee(user: any): boolean {
   return false;
 }
 
-interface SocialUserProfile {
-  id: number;
-  uid: string;
-  email: string | null;
-  name: string | null;
-  provider: string;
-  role: string;
-  onboarding_completed: boolean;
+interface SocialLoginSuccess {
+  status: "authenticated";
+  accessToken: string;
+  refreshToken: string;
+  user: UserProfile;
 }
 
-interface SocialLoginResult {
-  user: SocialUserProfile;
-  isNewUser: boolean;
+interface SocialLoginNeedsRegistration {
+  status: "needs_registration";
+  email: string;
+  displayName: string | null;
+  firebaseUid: string;
 }
+
+type SocialLoginResult = SocialLoginSuccess | SocialLoginNeedsRegistration;
 
 interface AuthContextValue {
   user: UserProfile | null;
@@ -63,7 +64,6 @@ interface AuthContextValue {
   refreshUser: () => Promise<void>;
   biometricLogin: () => Promise<boolean>;
   socialLogin: (idToken: string, provider: string) => Promise<SocialLoginResult>;
-  completeOnboarding: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -321,59 +321,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ token: idToken, provider }),
     });
 
+    const data = await res.json().catch(() => ({}));
+
+    if (res.status === 404 && data?.needsRegistration) {
+      return {
+        status: "needs_registration",
+        email: data.email || "",
+        displayName: data.displayName || null,
+        firebaseUid: data.firebaseUid || "",
+      };
+    }
+
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err?.message || "Authentification sociale échouée");
+      throw new Error(data?.message || "Authentification sociale échouée");
     }
 
-    const data = await res.json();
-    await storeToken("social_access_token", data.token);
-    setStoredAccessToken(data.token);
-
-    const socialUser = data.user as SocialUserProfile;
-    setUser(socialUser as any);
-
-    return { user: socialUser, isNewUser: data.isNewUser };
-  };
-
-  const completeOnboarding = async (): Promise<void> => {
-    const socialToken = await getToken("social_access_token");
-    if (!socialToken) return;
-
-    const apiBase = (() => {
-      if (Platform.OS === "web" && typeof window !== "undefined") {
-        const origin = window.location.origin;
-        if (origin.includes("localhost:8081") || origin.includes("127.0.0.1:8081")) {
-          return origin.replace(/:8081\b/, ":5000");
-        }
-        return origin;
-      }
-      if (process.env.EXPO_PUBLIC_DOMAIN) return `https://${process.env.EXPO_PUBLIC_DOMAIN}`;
-      return "https://saas3.mytoolsgroup.eu";
-    })();
-
-    const res = await fetch(`${apiBase}/api/auth/social/onboarding-complete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${socialToken}`,
-      },
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      if (data.token) {
-        await storeToken("social_access_token", data.token);
-        setStoredAccessToken(data.token);
-        try {
-          const parts = data.token.split(".");
-          if (parts.length === 3) {
-            const payload = JSON.parse(atob(parts[1]));
-            setUser(payload as any);
-          }
-        } catch {}
+    if (data.accessToken) {
+      await storeToken("access_token", data.accessToken);
+      setStoredAccessToken(data.accessToken);
+      setAdminTokens(data.accessToken, data.refreshToken || null);
+      if (data.refreshToken) {
+        await storeToken("refresh_token", data.refreshToken);
       }
     }
+
+    await removeToken("social_access_token");
+
+    const resolvedUser = data.user;
+    if (resolvedUser) {
+      setUser(resolvedUser as UserProfile);
+    }
+
+    return {
+      status: "authenticated",
+      accessToken: data.accessToken,
+      refreshToken: data.refreshToken,
+      user: resolvedUser as UserProfile,
+    };
   };
 
   const biometricLogin = async (): Promise<boolean> => {
@@ -450,7 +434,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refreshUser,
       biometricLogin,
       socialLogin,
-      completeOnboarding,
     }),
     [user, isLoading, storedAccessToken]
   );

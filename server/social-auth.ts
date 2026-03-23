@@ -7,6 +7,7 @@ const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
 const SOCIAL_JWT_SECRET =
   process.env.SOCIAL_JWT_SECRET || "social-auth-secret-change-in-production";
 const JWT_EXPIRES_IN = "30d";
+const EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
 
 // ── Firebase Admin SDK (lazy init) ──────────────────────────────────────────
 let adminApp: any = null;
@@ -25,7 +26,6 @@ function getAdminAuth() {
     const admin = require("firebase-admin");
     const serviceAccount = JSON.parse(serviceAccountJson);
 
-    // Replit Secrets encode newlines as literal \n — restore them for the private key
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
     }
@@ -35,7 +35,7 @@ function getAdminAuth() {
         credential: admin.credential.cert(serviceAccount),
       });
     } else {
-      admin.app(); // reuse existing app
+      admin.app();
     }
 
     adminApp = admin.auth();
@@ -84,101 +84,6 @@ async function verifyFirebaseIdToken(idToken: string): Promise<{
   };
 }
 
-async function verifyTwitterAccessToken(accessToken: string): Promise<{
-  uid: string;
-  email?: string;
-  displayName?: string;
-  photoUrl?: string;
-}> {
-  const res = await fetch(
-    "https://api.twitter.com/2/users/me?user.fields=id,name,profile_image_url",
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-
-  if (!res.ok) throw new Error("Token Twitter invalide");
-
-  const data = await res.json();
-  const user = data?.data;
-  if (!user) throw new Error("Impossible de récupérer l'utilisateur Twitter");
-
-  return {
-    uid: `twitter_${user.id}`,
-    displayName: user.name,
-    photoUrl: user.profile_image_url,
-  };
-}
-
-// ── DB helpers ───────────────────────────────────────────────────────────────
-async function upsertSocialUser(params: {
-  firebase_uid: string;
-  provider: string;
-  email?: string;
-  display_name?: string;
-  photo_url?: string;
-}): Promise<{ id: number; onboarding_completed: boolean; isNew: boolean }> {
-  const existing = await pool.query(
-    "SELECT id, onboarding_completed FROM social_users WHERE firebase_uid = $1",
-    [params.firebase_uid]
-  );
-
-  if (existing.rows.length > 0) {
-    await pool.query(
-      `UPDATE social_users SET
-         email = COALESCE($2, email),
-         display_name = COALESCE($3, display_name),
-         photo_url = COALESCE($4, photo_url),
-         updated_at = NOW()
-       WHERE firebase_uid = $1`,
-      [params.firebase_uid, params.email, params.display_name, params.photo_url]
-    );
-    return { ...existing.rows[0], isNew: false };
-  }
-
-  const result = await pool.query(
-    `INSERT INTO social_users (firebase_uid, provider, email, display_name, photo_url)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING id, onboarding_completed`,
-    [
-      params.firebase_uid,
-      params.provider,
-      params.email,
-      params.display_name,
-      params.photo_url,
-    ]
-  );
-  return { ...result.rows[0], isNew: true };
-}
-
-const EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
-
-async function checkEmailExistsInExternalApi(
-  email: string
-): Promise<{ exists: boolean; upstreamError: boolean }> {
-  try {
-    const url = `${EXTERNAL_API}/users/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`;
-    const res = await fetch(url, {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(10000),
-    });
-
-    const contentType = res.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      console.error("[SocialAuth] check-email: non-JSON response");
-      return { exists: false, upstreamError: true };
-    }
-
-    if (res.status >= 500) {
-      return { exists: false, upstreamError: true };
-    }
-
-    const data = await res.json();
-    return { exists: data?.exists === true, upstreamError: false };
-  } catch (err: any) {
-    console.error("[SocialAuth] check-email error:", err.message);
-    return { exists: false, upstreamError: true };
-  }
-}
-
 // ── Routes ───────────────────────────────────────────────────────────────────
 export function registerSocialAuthRoutes(app: Express) {
   app.post("/api/auth/social", async (req: Request, res: Response) => {
@@ -199,10 +104,11 @@ export function registerSocialAuthRoutes(app: Express) {
         photoUrl?: string;
       };
 
-      if (provider === "twitter") {
-        firebaseUser = await verifyTwitterAccessToken(token);
-      } else {
+      try {
         firebaseUser = await verifyFirebaseIdToken(token);
+      } catch (err: any) {
+        console.error("[SocialAuth] Firebase verify error:", err.message);
+        return res.status(401).json({ message: "Token Firebase invalide" });
       }
 
       if (!firebaseUser.email) {
@@ -211,78 +117,66 @@ export function registerSocialAuthRoutes(app: Express) {
         });
       }
 
-      const emailCheck = await checkEmailExistsInExternalApi(firebaseUser.email);
-      if (emailCheck.upstreamError) {
+      const externalRes = await fetch(
+        `${EXTERNAL_API}/mobile/auth/login-with-firebase`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
+          body: JSON.stringify({ idToken: token }),
+          signal: AbortSignal.timeout(15000),
+        }
+      );
+
+      const contentType = externalRes.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        console.error("[SocialAuth] External API returned non-JSON response");
         return res.status(503).json({
-          message: "Service temporairement indisponible. Veuillez réessayer dans quelques instants.",
-        });
-      }
-      if (!emailCheck.exists) {
-        return res.status(403).json({
-          message: "Aucun compte trouvé avec cette adresse email. Veuillez contacter votre administrateur.",
+          message: "Service temporairement indisponible. Veuillez réessayer.",
         });
       }
 
-      const socialUser = await upsertSocialUser({
-        firebase_uid: firebaseUser.uid,
-        provider,
-        email: firebaseUser.email,
-        display_name: firebaseUser.displayName,
-        photo_url: firebaseUser.photoUrl,
-      });
+      const externalData = await externalRes.json();
 
-      const jwtPayload = {
-        id: socialUser.id,
-        uid: firebaseUser.uid,
-        email: firebaseUser.email || null,
-        name: firebaseUser.displayName || null,
-        provider,
-        role: "client",
-        onboarding_completed: socialUser.onboarding_completed,
-      };
+      if (externalRes.status === 404) {
+        return res.status(404).json({
+          message: externalData?.message || "Aucun compte trouvé avec cette adresse email.",
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName || null,
+          firebaseUid: firebaseUser.uid,
+          needsRegistration: true,
+        });
+      }
 
-      const accessToken = jwt.sign(jwtPayload, SOCIAL_JWT_SECRET, {
-        expiresIn: JWT_EXPIRES_IN,
-      });
+      if (!externalRes.ok) {
+        return res.status(externalRes.status).json({
+          message: externalData?.message || "Authentification échouée",
+        });
+      }
+
+      const setCookieHeaders = externalRes.headers.getSetCookie?.() || [];
+      for (const cookie of setCookieHeaders) {
+        res.appendHeader("set-cookie", cookie);
+      }
 
       return res.json({
-        token: accessToken,
-        user: jwtPayload,
-        isNewUser: socialUser.isNew,
+        accessToken: externalData.accessToken,
+        refreshToken: externalData.refreshToken,
+        user: externalData.user,
+        firebaseUid: firebaseUser.uid,
       });
     } catch (err: any) {
       console.error("[SocialAuth] Error:", err.message);
+      if (err.name === "TimeoutError" || err.name === "AbortError") {
+        return res.status(503).json({
+          message: "Service temporairement indisponible. Veuillez réessayer.",
+        });
+      }
       return res
         .status(401)
         .json({ message: err.message || "Authentification sociale échouée" });
     }
   });
-
-  app.post(
-    "/api/auth/social/onboarding-complete",
-    async (req: Request, res: Response) => {
-      try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith("Bearer ")) {
-          return res.status(401).json({ message: "Token manquant" });
-        }
-        const token = authHeader.slice(7);
-        const decoded = jwt.verify(token, SOCIAL_JWT_SECRET) as any;
-
-        await pool.query(
-          "UPDATE social_users SET onboarding_completed = TRUE WHERE firebase_uid = $1",
-          [decoded.uid]
-        );
-
-        const newPayload = { ...decoded, onboarding_completed: true };
-        const newToken = jwt.sign(newPayload, SOCIAL_JWT_SECRET, {
-          expiresIn: JWT_EXPIRES_IN,
-        });
-
-        return res.json({ token: newToken });
-      } catch (err: any) {
-        return res.status(401).json({ message: "Token invalide" });
-      }
-    }
-  );
 }

@@ -96,14 +96,32 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       const result = await socialLogin(idToken, provider);
-      const onboardingDone =
-        result.user.onboarding_completed && !result.isNewUser;
 
-      if (onboardingDone) {
-        setTimeout(() => router.replace("/(main)" as any), 100);
-      } else {
-        setTimeout(() => router.replace("/onboarding" as any), 100);
+      if (result.status === "needs_registration") {
+        setLoading(false);
+        setTimeout(() => {
+          router.push({
+            pathname: "/(auth)/register" as any,
+            params: {
+              email: result.email || "",
+              displayName: result.displayName || "",
+              firebaseUid: result.firebaseUid || "",
+            },
+          });
+        }, 100);
+        return;
       }
+
+      const u = result.user;
+      const role = ((u as any)?.role || "").toLowerCase();
+      const isAdminOrEmp =
+        ["admin", "super_admin", "superadmin", "root_admin", "root"].includes(role) ||
+        (u as any)?.isAdmin === true || (u as any)?.is_admin === true ||
+        ["employe", "employee", "manager"].includes(role) ||
+        (u as any)?.isEmployee === true || (u as any)?.is_employee === true;
+      setTimeout(() => {
+        router.replace(isAdminOrEmp ? "/(admin)" as any : "/(main)" as any);
+      }, 100);
     } catch (err: any) {
       showAlert({
         type: "error",
@@ -251,6 +269,15 @@ export default function LoginScreen() {
               Cette application est réservée aux administrateurs de garage partenaires MyTools.
             </Text>
           </View>
+
+          <Pressable
+            style={styles.registerLink}
+            onPress={() => router.push("/(auth)/register" as any)}
+          >
+            <Text style={styles.registerLinkText}>Vous êtes un nouveau garage ?{" "}
+              <Text style={{ color: theme.primary, fontWeight: "600" }}>S'inscrire</Text>
+            </Text>
+          </Pressable>
 
           <View style={styles.legalRow}>
             <Pressable onPress={() => router.push("/privacy" as any)}>
@@ -448,6 +475,16 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
     color: theme.primary,
     fontSize: 14,
     fontFamily: "Inter_500Medium",
+  },
+  registerLink: {
+    alignItems: "center",
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  registerLinkText: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: theme.textSecondary,
   },
   supportLink: {
     flexDirection: "row",
