@@ -15,8 +15,8 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mytools.app",
-      "buildNumber": "2",
+      "bundleIdentifier": "app.mytoolsmobile.mytoolsgroup.eu",
+      "buildNumber": "14",
       "config": {
         "usesNonExemptEncryption": false
       },
