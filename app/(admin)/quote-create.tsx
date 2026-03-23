@@ -16,12 +16,15 @@ import OCRScannerModal, { OCRResult } from "@/components/OCRScannerModal";
 import { consumePendingNewClientId } from "@/lib/new-client-store";
 
 interface LineItem {
+  id: string;
   description: string;
   quantity: string;
   unitPrice: string;
   tvaRate: string;
   fromServiceId?: string;
 }
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 const TVA_OPTIONS = ["0", "10", "20"];
 
@@ -71,7 +74,7 @@ export default function QuoteCreateScreen() {
   const [showServicesPicker, setShowServicesPicker] = useState(false);
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { description: "", quantity: "1", unitPrice: "", tvaRate: "20" },
+    { id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" },
   ]);
   const [editLoaded, setEditLoaded] = useState(false);
 
@@ -94,6 +97,7 @@ export default function QuoteCreateScreen() {
     const existingItems: any[] = editQuote.items || editQuote.lineItems || editQuote.lines || editQuote.quote_items || [];
     if (existingItems.length > 0) {
       setLineItems(existingItems.map((it: any) => ({
+        id: uid(),
         description: it.description || it.name || "",
         quantity: String(it.quantity ?? 1),
         unitPrice: String(it.unit_price_excluding_tax ?? it.unitPriceExcludingTax ?? it.unitPrice ?? it.unit_price ?? it.price ?? 0),
@@ -250,6 +254,7 @@ export default function QuoteCreateScreen() {
     if (result.vehiclePlate) setVehiclePlate(result.vehiclePlate);
     if (result.items && result.items.length > 0) {
       setLineItems(result.items.map(it => ({
+        id: uid(),
         description: it.description || "",
         quantity: it.quantity || "1",
         unitPrice: it.unitPrice || "",
@@ -268,7 +273,7 @@ export default function QuoteCreateScreen() {
   };
 
   const addLineItem = () => {
-    setLineItems(prev => [...prev, { description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
+    setLineItems(prev => [...prev, { id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
   };
 
   const removeLineItem = (idx: number) => {
@@ -288,6 +293,7 @@ export default function QuoteCreateScreen() {
       if (newSelection.length > 0) {
         const selectedServiceObjs = servicesArr.filter((s: any) => newSelection.includes(s.id));
         const serviceItems: LineItem[] = selectedServiceObjs.map((s: any) => ({
+          id: uid(),
           description: s.name || s.label || "",
           quantity: "1",
           unitPrice: String(s.price || s.unitPrice || s.basePrice || s.priceHT || s.priceExcludingTax || s.hourlyRate || s.rate || 0),
@@ -301,7 +307,7 @@ export default function QuoteCreateScreen() {
       } else if (newSelection.length === 0) {
         setLineItems(prev => {
           const freeFormItems = prev.filter(it => !it.fromServiceId && it.description.trim());
-          return freeFormItems.length > 0 ? freeFormItems : [{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }];
+          return freeFormItems.length > 0 ? freeFormItems : [{ id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }];
         });
       }
       return newSelection;
@@ -557,7 +563,7 @@ export default function QuoteCreateScreen() {
           {lineItems.map((item, idx) => {
             const isLocked = !!item.fromServiceId;
             return (
-              <View key={idx} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
+              <View key={item.id} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
                 <View style={styles.lineItemHeader}>
                   <Text style={styles.lineItemLabel}>
                     Prestation {idx + 1}

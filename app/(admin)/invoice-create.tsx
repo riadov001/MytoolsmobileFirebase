@@ -18,11 +18,14 @@ import OCRScannerModal, { OCRResult } from "@/components/OCRScannerModal";
 import { consumePendingNewClientId } from "@/lib/new-client-store";
 
 interface LineItem {
+  id: string;
   description: string;
   quantity: string;
   unitPrice: string;
   tvaRate: string;
 }
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 const TVA_OPTIONS = ["0", "10", "20"];
 
@@ -79,7 +82,7 @@ export default function InvoiceCreateScreen() {
   const [notes, setNotes] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string | null>(null);
   const [showPaymentPicker, setShowPaymentPicker] = useState(false);
-  const [lineItems, setLineItems] = useState<LineItem[]>([]);
+  const [lineItems, setLineItems] = useState<LineItem[]>([{ id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
   const [photos, setPhotos] = useState<{ uri: string; name: string }[]>([]);
   const [showOCRModal, setShowOCRModal] = useState(false);
   const [editLoaded, setEditLoaded] = useState(false);
@@ -99,13 +102,14 @@ export default function InvoiceCreateScreen() {
     const existingItems: any[] = editInvoice.items || editInvoice.lineItems || editInvoice.lines || editInvoice.invoice_lines || [];
     if (existingItems.length > 0) {
       setLineItems(existingItems.map((it: any) => ({
+        id: uid(),
         description: it.description || it.name || "",
         quantity: String(it.quantity ?? 1),
         unitPrice: String(it.unit_price_excluding_tax ?? it.unitPriceExcludingTax ?? it.unitPrice ?? it.unit_price ?? it.price ?? 0),
         tvaRate: String(it.tax_rate ?? it.taxRate ?? it.tvaRate ?? 20),
       })));
     } else {
-      setLineItems([{ description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
+      setLineItems([{ id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
     }
     setEditLoaded(true);
   }, [editInvoice, isEditMode, editLoaded]);
@@ -251,6 +255,7 @@ export default function InvoiceCreateScreen() {
     if (result.paymentMethod) setPaymentMethod(result.paymentMethod);
     if (result.items && result.items.length > 0) {
       setLineItems(result.items.map(it => ({
+        id: uid(),
         description: it.description || "",
         quantity: it.quantity || "1",
         unitPrice: it.unitPrice || "",
@@ -269,7 +274,7 @@ export default function InvoiceCreateScreen() {
   };
 
   const addLineItem = () => {
-    setLineItems(prev => [...prev, { description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
+    setLineItems(prev => [...prev, { id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }]);
   };
 
   const removeLineItem = (idx: number) => {
@@ -517,6 +522,7 @@ export default function InvoiceCreateScreen() {
                     style={styles.serviceOption}
                     onPress={() => {
                       setLineItems(prev => [...prev, {
+                        id: uid(),
                         description: service.name || service.label || "",
                         quantity: "1",
                         unitPrice: String(servicePrice),
@@ -572,7 +578,7 @@ export default function InvoiceCreateScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Prestations *</Text>
           {lineItems.map((item, idx) => (
-            <View key={idx} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
+            <View key={item.id} style={[styles.lineItemCard, idx > 0 && { marginTop: 10 }]}>
               <View style={styles.lineItemHeader}>
                 <Text style={styles.lineItemLabel}>Prestation {idx + 1}</Text>
                 {lineItems.length > 1 && (
