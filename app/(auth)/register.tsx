@@ -165,7 +165,8 @@ export default function GarageRegisterScreen() {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || "Inscription échouée. Veuillez réessayer.");
+        console.error("[Register] API error:", res.status, JSON.stringify(err));
+        throw new Error(err?.message || err?.error || "Inscription échouée. Veuillez réessayer.");
       }
 
       setStep("success");
@@ -276,6 +277,15 @@ export default function GarageRegisterScreen() {
           Complétez vos informations pour créer votre compte garage.
         </Text>
       </View>
+
+      {!!firebaseUid && (
+        <View style={[styles.companyBadge, { backgroundColor: "#10B98115", marginBottom: 12 }]}>
+          <Ionicons name="logo-google" size={16} color="#10B981" />
+          <Text style={[styles.companyBadgeText, { color: "#10B981" }]}>
+            Connecté via Google — aucun mot de passe requis
+          </Text>
+        </View>
+      )}
 
       {company && (
         <View style={styles.companyBadge}>

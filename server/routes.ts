@@ -1621,9 +1621,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const parsed = JSON.parse(text);
         isJson = true;
-        const debugEndpoints = ["/invoices", "/quotes", "/reservations", "/services", "/login", "/auth"];
+        const debugEndpoints = ["/invoices", "/quotes", "/reservations", "/services", "/login", "/auth", "/mobile/auth", "/mobile/public"];
         const shouldLog = debugEndpoints.some(ep => req.url === ep || req.url.startsWith(ep + "?") || req.url.startsWith(ep + "/"));
-        if (shouldLog) {
+        if (response.status >= 400) {
+          console.log(`[PROXY-ERROR] ${req.method} /api${req.url} => ${response.status}:`, JSON.stringify(parsed).slice(0, 2000));
+        } else if (shouldLog) {
           if (Array.isArray(parsed) && parsed.length > 0) {
             console.log(`[DEBUG] ${req.method} /api${req.url} => Array[${parsed.length}], keys:`, Object.keys(parsed[0]), "sample:", JSON.stringify(parsed[0]).slice(0, 1500));
           } else if (parsed && typeof parsed === "object") {
