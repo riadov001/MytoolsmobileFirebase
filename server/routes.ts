@@ -1276,13 +1276,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (isMutationSuccess && docType && (data?.id || (req.method !== "POST" && routePath.match(/\/(quotes|invoices)\/([^/]+)$/))) && (bodyTTC > 0 || Array.isArray(bodyItems))) {
           const docId = data?.id || routePath.match(/\/(quotes|invoices)\/([^/]+)$/)?.[2] || "";
           const taxAmt = bodyTTC - bodyHT;
-          pool.query(
-            `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, items=$6, updated_at=NOW()`,
-            [docId, docType, bodyHT, bodyTTC, taxAmt, JSON.stringify(bodyItems || [])]
-          ).catch((e: any) => console.warn("[AMOUNTS] save failed:", e.message));
-          console.log(`[AMOUNTS] Saved ${docType} ${docId}: HT=${bodyHT} TTC=${bodyTTC} items=${Array.isArray(bodyItems) ? bodyItems.length : 0}`);
+          try {
+            await pool.query(
+              `INSERT INTO document_amounts (doc_id, doc_type, price_excluding_tax, total_including_tax, tax_amount, items)
+               VALUES ($1, $2, $3, $4, $5, $6)
+               ON CONFLICT (doc_id) DO UPDATE SET price_excluding_tax=$3, total_including_tax=$4, tax_amount=$5, items=$6, updated_at=NOW()`,
+              [docId, docType, bodyHT, bodyTTC, taxAmt, JSON.stringify(bodyItems || [])]
+            );
+            console.log(`[AMOUNTS] Saved ${docType} ${docId}: HT=${bodyHT} TTC=${bodyTTC} items=${Array.isArray(bodyItems) ? bodyItems.length : 0}`);
+          } catch (e: any) {
+            console.warn("[AMOUNTS] save failed:", e.message);
+          }
         }
 
         // Enrichir les réponses avec les montants locaux si l'API retourne 0
@@ -1306,7 +1310,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
               const enriched: any = { ...item };
 
-              if (ttc > 0 && (apiHT <= 0 && apiTTC <= 0)) {
+              if (ht > 0 || ttc > 0) {
                 enriched.priceExcludingTax = String(ht);
                 enriched.quoteAmount = String(ttc);
                 enriched.amount = String(ttc);
@@ -1316,22 +1320,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 enriched._localAmounts = true;
               }
 
-              if (!hasLocalItems && localItems.length > 0) {
+              if (localItems.length > 0) {
                 enriched.items = localItems;
                 enriched.lineItems = localItems;
                 enriched._localItems = true;
-                console.log(`[ENRICH] Injected ${localItems.length} local items for ${item.id}`);
+                if (!hasLocalItems || localItems.length !== existingItems.length) {
+                  console.log(`[ENRICH] Injected ${localItems.length} local items for ${item.id} (API had ${existingItems.length})`);
+                }
               }
 
+              try {
+                const photoRows = await pool.query("SELECT photo_uri FROM document_photos WHERE doc_id=$1 ORDER BY created_at", [item.id]);
+                if (photoRows.rows.length > 0) {
+                  const photoUrls = photoRows.rows.map((r: any) => r.photo_uri);
+                  enriched.photos = photoUrls;
+                  enriched.mediaUrls = photoUrls;
+                }
+              } catch {}
+
               if (enriched._localAmounts || enriched._localItems) {
-                try {
-                  const photoRows = await pool.query("SELECT photo_uri FROM document_photos WHERE doc_id=$1 ORDER BY created_at", [item.id]);
-                  if (photoRows.rows.length > 0) {
-                    const photoUrls = photoRows.rows.map((r: any) => r.photo_uri);
-                    enriched.photos = photoUrls;
-                    enriched.mediaUrls = photoUrls;
-                  }
-                } catch {}
                 return enriched;
               }
             }
