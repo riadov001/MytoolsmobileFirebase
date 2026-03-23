@@ -267,6 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await removeToken("access_token");
     await removeToken("refresh_token");
     await removeToken("social_access_token");
+    await removeToken("biometric_enabled");
     setSessionCookie(null);
   };
 

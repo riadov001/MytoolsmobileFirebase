@@ -86,9 +86,7 @@ export default function GarageRegisterScreen() {
       });
       if (!garageName && (data.name || data.companyName)) setGarageName(data.name || data.companyName);
     } catch (err: any) {
-      if (isSiret) {
-        showAlert({ type: "error", title: "Recherche échouée", message: err.message || "Impossible de trouver l'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
-      }
+      showAlert({ type: "error", title: "Recherche échouée", message: err.message || "Impossible de trouver l'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
       setCompany(null);
     } finally {
       setLoading(false);
@@ -199,6 +197,14 @@ export default function GarageRegisterScreen() {
           }
         } catch (loginErr: any) {
           console.error("[Register] Auto-login after registration failed:", loginErr.message);
+          showAlert({
+            type: "info",
+            title: "Compte créé",
+            message: "Votre compte a été créé avec succès. Veuillez vous connecter.",
+            buttons: [{ text: "Se connecter", style: "primary", onPress: () => router.replace("/(auth)/login") }],
+          });
+          setLoading(false);
+          return;
         }
       }
 

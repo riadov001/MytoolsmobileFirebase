@@ -23,7 +23,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
 
-const EXTERNAL_API_BASE = "https://stoath-my-tools-pwa-v-10-prod-saas-pafinv-v-19--Stpathh.replit.app";
+const EXTERNAL_API_BASE = "https://saas3.mytoolsgroup.eu";
 
 function getStatusInfo(status: string, isDark: boolean) {
   const s = status?.toLowerCase() || "";

@@ -14,7 +14,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { FloatingSupport } from "@/components/FloatingSupport";
 
-const API_BASE = "https://stoath-my-tools-pwa-v-10-prod-saas-pafinv-v-19--Stpathh.replit.app";
+
 
 function getStatusInfo(status: string, isDark: boolean) {
   const s = status?.toLowerCase() || "";
