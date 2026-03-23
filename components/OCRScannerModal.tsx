@@ -6,6 +6,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
 import { useTheme } from "@/lib/theme";
 import { getApiUrl } from "@/lib/query-client";
 
@@ -66,7 +67,8 @@ export default function OCRScannerModal({ visible, mode, onResult, onClose }: Pr
     try {
       const { base64, mimeType } = await imageToBase64(uri);
       const apiBase = getApiUrl();
-      const response = await fetch(new URL("/api/ocr/analyze", apiBase).toString(), {
+      const url = new URL("/api/ocr/analyze", apiBase).toString();
+      const response = await expoFetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageBase64: base64, mimeType, mode }),
@@ -79,7 +81,8 @@ export default function OCRScannerModal({ visible, mode, onResult, onClose }: Pr
       onResult(json.data as OCRResult);
       onClose();
     } catch (err: any) {
-      Alert.alert("Erreur", "Impossible d'analyser l'image. Vérifiez votre connexion.");
+      console.error("[OCR] analyze error:", err?.message || err);
+      Alert.alert("Erreur OCR", "Impossible d'analyser l'image. " + (err?.message || "Vérifiez votre connexion."));
     } finally {
       setIsAnalyzing(false);
     }
@@ -93,7 +96,7 @@ export default function OCRScannerModal({ visible, mode, onResult, onClose }: Pr
     }
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: "images",
-      quality: 0.8,
+      quality: 0.5,
       base64: false,
     });
     if (!result.canceled && result.assets[0]) {
@@ -109,7 +112,7 @@ export default function OCRScannerModal({ visible, mode, onResult, onClose }: Pr
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: "images",
-      quality: 0.8,
+      quality: 0.5,
       base64: false,
     });
     if (!result.canceled && result.assets[0]) {
