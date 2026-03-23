@@ -45,7 +45,7 @@ export default function UsersScreen() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: any) => adminClients.update(editingUser.id, data),
+    mutationFn: (data: any) => adminClients.update(data._userId, { firstName: data.firstName, lastName: data.lastName, email: data.email, role: data.role }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-users"] });
       setEditingUser(null);
@@ -79,7 +79,7 @@ export default function UsersScreen() {
       return;
     }
     if (editingUser) {
-      updateMutation.mutate(formData);
+      updateMutation.mutate({ ...formData, _userId: editingUser.id });
     } else {
       createMutation.mutate(formData);
     }
@@ -105,11 +105,15 @@ export default function UsersScreen() {
     );
   }
 
-  const usersArr = Array.isArray(users) ? users : [];
+  const rawUsers = Array.isArray(users) ? users : (users as any)?.data || (users as any)?.users || (users as any)?.results || [];
+  const usersArr = Array.isArray(rawUsers) ? rawUsers : [];
 
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: topPad }]}>
+        <Pressable style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color={theme.text} />
+        </Pressable>
         <Text style={styles.title}>Utilisateurs</Text>
         <Pressable style={styles.addBtn} onPress={() => { setEditingUser(null); setFormData({ firstName: "", lastName: "", email: "", role: "user" }); setShowCreateModal(true); }}>
           <Ionicons name="add" size={22} color="#fff" />
@@ -197,8 +201,9 @@ export default function UsersScreen() {
 
 const getStyles = (theme: ThemeColors) => StyleSheet.create({
   container: { flex: 1, backgroundColor: theme.background },
-  header: { paddingHorizontal: 16, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: theme.border },
-  title: { fontSize: 18, fontFamily: "Inter_700Bold", color: theme.text },
+  header: { paddingHorizontal: 16, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: 1, borderBottomColor: theme.border, gap: 12 },
+  backBtn: { padding: 4 },
+  title: { fontSize: 18, fontFamily: "Inter_700Bold", color: theme.text, flex: 1 },
   addBtn: { backgroundColor: theme.primary, width: 40, height: 40, borderRadius: 10, justifyContent: "center", alignItems: "center" },
   emptyState: { flex: 1, justifyContent: "center", alignItems: "center", gap: 8, paddingVertical: 48 },
   emptyText: { fontSize: 14, color: theme.textSecondary },

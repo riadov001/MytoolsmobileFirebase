@@ -278,8 +278,10 @@ export default function InvoiceCreateScreen() {
   };
 
   const removeLineItem = (idx: number) => {
-    if (lineItems.length === 1) return;
-    setLineItems(prev => prev.filter((_, i) => i !== idx));
+    setLineItems(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const updateLineItem = (idx: number, field: keyof LineItem, val: string) => {

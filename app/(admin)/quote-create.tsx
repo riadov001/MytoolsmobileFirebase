@@ -277,7 +277,10 @@ export default function QuoteCreateScreen() {
   };
 
   const removeLineItem = (idx: number) => {
-    setLineItems(prev => prev.filter((_, i) => i !== idx));
+    setLineItems(prev => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((_, i) => i !== idx);
+    });
   };
 
   const updateLineItem = (idx: number, field: keyof LineItem, val: string) => {
@@ -286,32 +289,38 @@ export default function QuoteCreateScreen() {
 
   const servicesArr = Array.isArray(services) ? services : [];
 
+  const selectedServicesRef = React.useRef(selectedServices);
+  selectedServicesRef.current = selectedServices;
+
   const toggleService = (serviceId: string) => {
-    setSelectedServices(prev => {
-      const newSelection = prev.includes(serviceId) ? prev.filter(id => id !== serviceId) : [...prev, serviceId];
-      
-      if (newSelection.length > 0) {
-        const selectedServiceObjs = servicesArr.filter((s: any) => newSelection.includes(s.id));
-        const serviceItems: LineItem[] = selectedServiceObjs.map((s: any) => ({
-          id: uid(),
-          description: s.name || s.label || "",
-          quantity: "1",
-          unitPrice: String(s.price || s.unitPrice || s.basePrice || s.priceHT || s.priceExcludingTax || s.hourlyRate || s.rate || 0),
-          tvaRate: String(s.taxRate || s.tvaRate || "20"),
-          fromServiceId: s.id,
-        }));
-        setLineItems(prev => {
-          const freeFormItems = prev.filter(it => !it.fromServiceId && it.description.trim());
-          return [...serviceItems, ...freeFormItems];
-        });
-      } else if (newSelection.length === 0) {
-        setLineItems(prev => {
-          const freeFormItems = prev.filter(it => !it.fromServiceId && it.description.trim());
-          return freeFormItems.length > 0 ? freeFormItems : [{ id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }];
-        });
-      }
-      return newSelection;
-    });
+    const current = selectedServicesRef.current;
+    const newSelection = current.includes(serviceId)
+      ? current.filter(id => id !== serviceId)
+      : [...current, serviceId];
+
+    setSelectedServices(newSelection);
+
+    const selectedServiceObjs = servicesArr.filter((s: any) => newSelection.includes(s.id));
+    const serviceItems: LineItem[] = selectedServiceObjs.map((s: any) => ({
+      id: uid(),
+      description: s.name || s.label || "",
+      quantity: "1",
+      unitPrice: String(s.price || s.unitPrice || s.basePrice || s.priceHT || s.priceExcludingTax || s.hourlyRate || s.rate || 0),
+      tvaRate: String(s.taxRate || s.tvaRate || "20"),
+      fromServiceId: s.id,
+    }));
+
+    if (newSelection.length > 0) {
+      setLineItems(prevItems => {
+        const freeFormItems = prevItems.filter(it => !it.fromServiceId && it.description.trim());
+        return [...serviceItems, ...freeFormItems];
+      });
+    } else {
+      setLineItems(prevItems => {
+        const freeFormItems = prevItems.filter(it => !it.fromServiceId && it.description.trim());
+        return freeFormItems.length > 0 ? freeFormItems : [{ id: uid(), description: "", quantity: "1", unitPrice: "", tvaRate: "20" }];
+      });
+    }
   };
 
   const { totalHT, totalTVA, totalTTC } = calcTotals(lineItems);

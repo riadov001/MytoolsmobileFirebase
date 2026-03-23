@@ -87,8 +87,15 @@ The admin tab bar has the following tabs:
 
 The "Plus" tab replaced the previous "RDV" tab and provides access to:
 - Rendez-vous (reservations) — always available
+- Utilisateurs — CRUD management of garage users (create, edit, delete) via `/api/admin/users`
 - OCR Scanner (quote/invoice) — always available
 - AI Analytics (global, commercial, growth) — conditionally available based on garage plan (Pro+)
+
+## Users Management
+- Screen: `app/(admin)/users.tsx` — modal presentation from Plus tab
+- API: `adminClients` in `lib/admin-api.ts` (routes to `/api/admin/users`)
+- Features: list users, create, edit (modal form), delete with confirmation
+- Handles various API response formats (array, `{data:[]}`, `{users:[]}`, `{results:[]}`)
 
 ## Photo Upload
 - Quotes: Two-step process — create quote shell, then upload media via POST to `/api/admin/quotes/{id}/media`
