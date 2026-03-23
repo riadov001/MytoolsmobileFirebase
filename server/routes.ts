@@ -139,7 +139,7 @@ function forwardSetCookie(externalRes: globalThis.Response, expressRes: Response
   }
 }
 
-const LOG_BUFFER_SIZE = 200;
+const LOG_BUFFER_SIZE = 2000;
 const logBuffer: Array<{ timestamp: string; level: string; message: string; source: string }> = [];
 
 function pushLog(level: string, message: string, source = "server") {
@@ -192,12 +192,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch {
       return res.status(500).json({ message: "Erreur de vérification" });
     }
+    let entries = [...logBuffer];
     const since = req.query.since as string | undefined;
-    let entries = logBuffer;
-    if (since) {
-      entries = logBuffer.filter(e => e.timestamp > since);
+    const level = req.query.level as string | undefined;
+    const search = req.query.search as string | undefined;
+    const limit = parseInt(req.query.limit as string || "0", 10);
+    const offset = parseInt(req.query.offset as string || "0", 10);
+
+    if (since) entries = entries.filter(e => e.timestamp > since);
+    if (level) {
+      const levels = level.split(",").map(l => l.trim().toLowerCase());
+      entries = entries.filter(e => levels.includes(e.level));
     }
-    res.json({ logs: entries, total: logBuffer.length });
+    if (search) {
+      const s = search.toLowerCase();
+      entries = entries.filter(e => e.message.toLowerCase().includes(s));
+    }
+
+    const totalFiltered = entries.length;
+    entries.reverse();
+    if (offset > 0) entries = entries.slice(offset);
+    if (limit > 0) entries = entries.slice(0, limit);
+
+    res.json({ logs: entries, total: logBuffer.length, filtered: totalFiltered });
   });
 
   app.get("/api/admin/swagger-spec", async (req: Request, res: Response) => {
@@ -215,6 +232,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       return res.status(500).json({ message: err.message });
     }
+  });
+
+  app.get("/api/admin/logs/export", async (req: Request, res: Response) => {
+    const auth = req.headers["authorization"] || "";
+    if (!auth) return res.status(401).json({ message: "Non authentifié" });
+    try {
+      const meRes = await fetch(`${EXTERNAL_API}/mobile/auth/me`, {
+        headers: { "authorization": auth, "accept": "application/json" },
+      });
+      if (!meRes.ok) return res.status(401).json({ message: "Token invalide" });
+      const user: any = await meRes.json();
+      const role = (user?.role || "").toLowerCase();
+      if (role !== "root_admin" && role !== "root") {
+        return res.status(403).json({ message: "Accès réservé aux root admins" });
+      }
+    } catch {
+      return res.status(500).json({ message: "Erreur de vérification" });
+    }
+
+    const format = (req.query.format as string || "json").toLowerCase();
+    let entries = [...logBuffer];
+    const level = req.query.level as string | undefined;
+    if (level) {
+      const levels = level.split(",").map(l => l.trim().toLowerCase());
+      entries = entries.filter(e => levels.includes(e.level));
+    }
+    entries.reverse();
+
+    if (format === "csv") {
+      const header = "timestamp,level,source,message";
+      const rows = entries.map(e =>
+        `"${e.timestamp}","${e.level}","${e.source}","${e.message.replace(/"/g, '""')}"`
+      );
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", `attachment; filename=logs-${new Date().toISOString().slice(0, 10)}.csv`);
+      return res.send([header, ...rows].join("\n"));
+    }
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", `attachment; filename=logs-${new Date().toISOString().slice(0, 10)}.json`);
+    return res.json({ exportedAt: new Date().toISOString(), total: entries.length, logs: entries });
   });
 
   app.delete("/api/admin/logs", async (req: Request, res: Response) => {

@@ -136,7 +136,16 @@ export default function AdminClientsScreen() {
           contentFit="contain"
         />
         <Text style={styles.screenTitle}>Clients</Text>
-        <View style={{ width: 44 }} />
+        <Pressable
+          style={styles.addBtn}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            router.push("/(admin)/client-form" as any);
+          }}
+          accessibilityLabel="Nouveau client"
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+        </Pressable>
       </View>
 
       <View style={styles.searchRow}>

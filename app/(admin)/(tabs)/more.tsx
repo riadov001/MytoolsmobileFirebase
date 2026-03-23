@@ -10,12 +10,20 @@ import * as Haptics from "expo-haptics";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { getGaragePlan, adminAnalytics } from "@/lib/admin-api";
+import { useAuth } from "@/lib/auth-context";
 import OCRScannerModal from "@/components/OCRScannerModal";
+
+const ROOT_ROLES = ["root", "root_admin"];
+const SUPER_ROLES = ["super_admin", "superadmin"];
 
 export default function MoreScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
+  const { user } = useAuth();
+  const loggedRole = (user?.role || "").toLowerCase();
+  const isRootAdmin = ROOT_ROLES.includes(loggedRole);
+  const isSuperOrRoot = isRootAdmin || SUPER_ROLES.includes(loggedRole);
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 90;
 
@@ -70,16 +78,16 @@ export default function MoreScreen() {
       label: "Rendez-vous",
       sub: "Gérer les rendez-vous",
       color: "#22C55E",
-      always: true,
+      visible: true,
       onPress: () => router.push("/(admin)/(tabs)/reservations" as any),
     },
     {
       id: "users",
       icon: "people-outline" as const,
       label: "Utilisateurs",
-      sub: "Gérer les utilisateurs du garage",
+      sub: "Gérer les administrateurs du garage",
       color: "#06B6D4",
-      always: true,
+      visible: isSuperOrRoot,
       onPress: () => router.push("/(admin)/users" as any),
     },
     {
@@ -88,7 +96,7 @@ export default function MoreScreen() {
       label: "Scanner un devis",
       sub: "OCR intelligent avec IA",
       color: "#8B5CF6",
-      always: true,
+      visible: true,
       onPress: () => handleOCR("quote"),
     },
     {
@@ -97,8 +105,17 @@ export default function MoreScreen() {
       label: "Scanner une facture",
       sub: "OCR intelligent avec IA",
       color: "#3B82F6",
-      always: true,
+      visible: true,
       onPress: () => handleOCR("invoice"),
+    },
+    {
+      id: "admin_logs",
+      icon: "terminal-outline" as const,
+      label: "Logs système",
+      sub: "Erreurs, alertes et traces serveur",
+      color: "#EF4444",
+      visible: isRootAdmin,
+      onPress: () => router.push("/(admin)/admin-logs" as any),
     },
     {
       id: "ai_global",
@@ -106,7 +123,7 @@ export default function MoreScreen() {
       label: "Analyse globale IA",
       sub: "Vue d'ensemble de votre activité",
       color: "#F59E0B",
-      always: false,
+      visible: hasAI,
       onPress: () => handleAIAnalysis("ai_global"),
     },
     {
@@ -115,7 +132,7 @@ export default function MoreScreen() {
       label: "Analyse commerciale",
       sub: "Performance et chiffre d'affaires",
       color: "#10B981",
-      always: false,
+      visible: hasAI,
       onPress: () => handleAIAnalysis("ai_commercial"),
     },
     {
@@ -124,12 +141,12 @@ export default function MoreScreen() {
       label: "Analyse croissance",
       sub: "Tendances et prévisions",
       color: "#EC4899",
-      always: false,
+      visible: hasAI,
       onPress: () => handleAIAnalysis("ai_growth"),
     },
   ];
 
-  const visibleFeatures = featureItems.filter(f => f.always || hasAI);
+  const visibleFeatures = featureItems.filter(f => f.visible);
 
   return (
     <View style={styles.container}>
