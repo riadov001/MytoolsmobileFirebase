@@ -25,10 +25,17 @@ function getAdminAuth() {
     const admin = require("firebase-admin");
     const serviceAccount = JSON.parse(serviceAccountJson);
 
+    // Replit Secrets encode newlines as literal \n — restore them for the private key
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, "\n");
+    }
+
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
       });
+    } else {
+      admin.app(); // reuse existing app
     }
 
     adminApp = admin.auth();
