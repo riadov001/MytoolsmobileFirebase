@@ -27,13 +27,6 @@ function CreateModal({ visible, onClose }: { visible: boolean; onClose: () => vo
       route: "/(admin)/invoice-create",
     },
     {
-      icon: "person-add-outline" as const,
-      label: "Nouveau client",
-      sub: "Ajouter un client",
-      color: "#10B981",
-      route: "/(admin)/client-form",
-    },
-    {
       icon: "calendar-outline" as const,
       label: "Nouveau RDV",
       sub: "Planifier un rendez-vous",

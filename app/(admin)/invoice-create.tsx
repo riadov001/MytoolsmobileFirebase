@@ -446,16 +446,6 @@ export default function InvoiceCreateScreen() {
                   autoCapitalize="none"
                 />
               </View>
-              <Pressable
-                style={styles.addClientBtn}
-                onPress={() => router.push({ pathname: "/(admin)/client-form", params: { returnTo: "invoice-create" } })}
-              >
-                <View style={[styles.addClientIcon, { backgroundColor: theme.primary + "15" }]}>
-                  <Ionicons name="person-add" size={16} color={theme.primary} />
-                </View>
-                <Text style={[styles.addClientText, { color: theme.primary }]}>Nouveau client</Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.primary} />
-              </Pressable>
               <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                 {clientsLoading ? (
                   <ActivityIndicator size="small" color={theme.primary} style={{ padding: 12 }} />

@@ -73,7 +73,6 @@ const GUIDE_SECTIONS: GuideSection[] = [
       "Consultez la liste de tous les clients avec leurs coordonnées (email, téléphone).",
       "Recherchez un client par nom ou email.",
       "Appuyez sur un client pour voir sa fiche détaillée.",
-      "Créez un nouveau client avec le bouton « + ».",
     ],
   },
   {

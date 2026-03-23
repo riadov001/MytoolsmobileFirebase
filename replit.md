@@ -33,12 +33,16 @@ Stores social auth users locally with onboarding status.
 - `EXPO_PUBLIC_TWITTER_CLIENT_ID`
 
 **Backend:**
-- `FIREBASE_WEB_API_KEY` (same value as EXPO_PUBLIC_FIREBASE_API_KEY)
+- `FIREBASE_SERVICE_ACCOUNT_JSON` (Firebase Admin SDK service account JSON)
 - `SOCIAL_JWT_SECRET` (secret for signing social auth JWTs)
+
+### Social auth email verification
+Social login (Google/Apple) now checks if the user's email exists in the external API database before allowing access. Calls `GET https://saas3.mytoolsgroup.eu/api/users/check-email?email=xxx` — returns `{ exists: true/false }`. If the email is not found, login is rejected with a 403 error.
 
 ### Navigation after social login
 - New user or onboarding not completed → `/onboarding`
 - Returning user with onboarding done → `/(main)`
+- Email not found in external DB → error alert on login screen
 
 ## System Architecture
 The application is built using Expo React Native with file-based routing via Expo Router for the frontend. It consumes an external API hosted on `saas3.mytoolsgroup.eu`. Authentication is handled via a dual system: Bearer tokens for admin API calls and cookie sessions for client-side interactions. State management utilizes React Query for server data and React Context for authentication.
@@ -55,7 +59,7 @@ Key features include:
 - Invoice creation is integrated with quotes via a "Générer facture" button in quote detail, requiring photo upload for quotes.
 - Numeric conversion and sanitization of items array for API payloads.
 - PDF sharing via PWA URLs (saas3.mytoolsgroup.eu/quotes/view/{viewToken} or /invoices/view/{viewToken}).
-- "Nouveau client" inline flow in all create screens.
+- Client creation is disabled — only editing existing clients is allowed. "Nouveau client" buttons have been removed from the create modal, clients list, and all create forms (quote, invoice, reservation).
 
 ## Tab Navigation
 The admin tab bar has the following tabs:

@@ -136,13 +136,7 @@ export default function AdminClientsScreen() {
           contentFit="contain"
         />
         <Text style={styles.screenTitle}>Clients</Text>
-        <Pressable
-          style={styles.addBtn}
-          onPress={() => router.push("/(admin)/client-form" as any)}
-          accessibilityLabel="Nouveau client"
-        >
-          <Ionicons name="add" size={22} color="#fff" />
-        </Pressable>
+        <View style={{ width: 44 }} />
       </View>
 
       <View style={styles.searchRow}>

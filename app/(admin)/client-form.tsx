@@ -127,6 +127,20 @@ export default function ClientFormScreen() {
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
 
+  if (!isEdit) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center", gap: 16 }]}>
+        <Ionicons name="close-circle-outline" size={48} color="#EF4444" />
+        <Text style={{ fontSize: 16, color: theme.text, textAlign: "center", paddingHorizontal: 32, fontFamily: "Inter_500Medium" }}>
+          La création de clients est désactivée.
+        </Text>
+        <Pressable style={{ paddingHorizontal: 24, paddingVertical: 12, backgroundColor: theme.primary, borderRadius: 12 }} onPress={() => router.back()}>
+          <Text style={{ color: "#fff", fontFamily: "Inter_600SemiBold" }}>Retour</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   if (isEdit && loadingExisting) {
     return (
       <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>

@@ -149,6 +149,36 @@ async function upsertSocialUser(params: {
   return { ...result.rows[0], isNew: true };
 }
 
+const EXTERNAL_API = "https://saas3.mytoolsgroup.eu/api";
+
+async function checkEmailExistsInExternalApi(
+  email: string
+): Promise<{ exists: boolean; upstreamError: boolean }> {
+  try {
+    const url = `${EXTERNAL_API}/users/check-email?email=${encodeURIComponent(email.trim().toLowerCase())}`;
+    const res = await fetch(url, {
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      console.error("[SocialAuth] check-email: non-JSON response");
+      return { exists: false, upstreamError: true };
+    }
+
+    if (res.status >= 500) {
+      return { exists: false, upstreamError: true };
+    }
+
+    const data = await res.json();
+    return { exists: data?.exists === true, upstreamError: false };
+  } catch (err: any) {
+    console.error("[SocialAuth] check-email error:", err.message);
+    return { exists: false, upstreamError: true };
+  }
+}
+
 // ── Routes ───────────────────────────────────────────────────────────────────
 export function registerSocialAuthRoutes(app: Express) {
   app.post("/api/auth/social", async (req: Request, res: Response) => {
@@ -173,6 +203,24 @@ export function registerSocialAuthRoutes(app: Express) {
         firebaseUser = await verifyTwitterAccessToken(token);
       } else {
         firebaseUser = await verifyFirebaseIdToken(token);
+      }
+
+      if (!firebaseUser.email) {
+        return res.status(403).json({
+          message: "Aucune adresse email associée à ce compte. Connexion refusée.",
+        });
+      }
+
+      const emailCheck = await checkEmailExistsInExternalApi(firebaseUser.email);
+      if (emailCheck.upstreamError) {
+        return res.status(503).json({
+          message: "Service temporairement indisponible. Veuillez réessayer dans quelques instants.",
+        });
+      }
+      if (!emailCheck.exists) {
+        return res.status(403).json({
+          message: "Aucun compte trouvé avec cette adresse email. Veuillez contacter votre administrateur.",
+        });
       }
 
       const socialUser = await upsertSocialUser({
