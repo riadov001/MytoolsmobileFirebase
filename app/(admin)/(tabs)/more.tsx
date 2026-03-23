@@ -74,6 +74,15 @@ export default function MoreScreen() {
       onPress: () => router.push("/(admin)/(tabs)/reservations" as any),
     },
     {
+      id: "users",
+      icon: "people-outline" as const,
+      label: "Utilisateurs",
+      sub: "Gérer les utilisateurs du garage",
+      color: "#06B6D4",
+      always: true,
+      onPress: () => router.push("/(admin)/users" as any),
+    },
+    {
       id: "ocr_quote",
       icon: "scan-outline" as const,
       label: "Scanner un devis",
