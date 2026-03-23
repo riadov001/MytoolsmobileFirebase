@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "kJdiwKYHo5lBSguA9rReT"
+uri = "file://.local/prompt-backend-saas3.md"
+type = "text"
+title = "Prompt pour corriger le backend saas3"
