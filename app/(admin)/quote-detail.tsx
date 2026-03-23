@@ -8,7 +8,7 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminQuotes, adminClients, sharePdfLink } from "@/lib/admin-api";
+import { adminQuotes, adminClients, sharePdfDirect, getAdminAccessToken } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -437,7 +437,7 @@ export default function QuoteDetailScreen() {
                 setPdfLoading(true);
                 try {
                   const ref = q?.quoteNumber || q?.reference || id;
-                  const result = await sharePdfLink("quotes", q?.viewToken, id, ref);
+                  const result = await sharePdfDirect("quotes", id, ref);
                   Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                   if (result === "copied") {
                     showAlert({

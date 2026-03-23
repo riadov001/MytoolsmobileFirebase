@@ -18,6 +18,7 @@ import * as Linking from "expo-linking";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { quotesApi, reservationsApi, getBackendUrl, getSessionCookie, Quote } from "@/lib/api";
+import { getAdminAccessToken } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -184,7 +185,6 @@ export default function QuoteDetailScreen() {
     (quote as any).vatAmount ||
     (quote as any).vat_amount;
   const viewToken = ((quote as any).viewToken || (quote as any).pdfToken || (quote as any).token || (quote as any).publicToken || (quote as any).shareToken || (quote as any).accessToken || (quote as any).publicId) as string | undefined;
-  const directPdfUrl = (quote as any).pdfUrl || (quote as any).pdf_url || (quote as any).documentUrl || (quote as any).document_url;
   const expiryDate = (quote as any).expiryDate || (quote as any).validUntil;
   const displayRef = (quote as any).reference || (quote as any).quoteNumber || quote.id;
   const rawRequestDetails = (quote as any).requestDetails || (quote as any).description || "";
@@ -208,9 +208,7 @@ export default function QuoteDetailScreen() {
   const finalStatuses = new Set(["accepted", "accepté", "accepte", "rejected", "refusé", "refuse", "refused", "completed", "terminé", "termine", "cancelled", "annulé", "annule", "annulée", "annulee"]);
   const canRespond = !isPending && !finalStatuses.has(statusLower);
 
-  const pdfUrl = viewToken
-    ? `${getBackendUrl()}/api/proxy/quote-pdf/${viewToken}`
-    : directPdfUrl || null;
+  const pdfUrl = `${getBackendUrl()}/api/mobile/quotes/${id}/pdf`;
 
   const existingReservation = (allReservations as any[]).find(
     (r) => r.quoteId === id || r.quoteId === quote?.id
@@ -223,20 +221,37 @@ export default function QuoteDetailScreen() {
     : null;
 
   const handleDownloadPdf = async () => {
-    const url = pdfUrl;
-    if (!url) return;
     if (Platform.OS === "web") {
-      try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
+      try {
+        const headers: Record<string, string> = { Accept: "application/pdf" };
+        const token = getAdminAccessToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(pdfUrl, { headers });
+        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `devis-${displayRef || id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err: any) {
+        showAlert({ type: "error", title: "Erreur", message: err?.message || "Impossible de télécharger le devis.", buttons: [{ text: "OK", style: "primary" }] });
+      }
       return;
     }
     setDownloading(true);
     try {
+      const token = getAdminAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const cookie = getSessionCookie();
-      const filename = `devis-${id}-${Date.now()}.pdf`;
+      if (cookie) headers["Cookie"] = cookie;
+      const filename = `devis-${displayRef || id}-${Date.now()}.pdf`;
       const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
-      const result = await FileSystem.downloadAsync(url, fileUri, {
-        headers: cookie ? { Cookie: cookie } : {},
-      });
+      const result = await FileSystem.downloadAsync(pdfUrl, fileUri, { headers });
       if (result.status !== 200) throw new Error(`Erreur ${result.status}`);
       const sharingAvailable = await Sharing.isAvailableAsync();
       if (sharingAvailable) {
@@ -245,8 +260,6 @@ export default function QuoteDetailScreen() {
           dialogTitle: "Devis PDF",
           UTI: "com.adobe.pdf",
         });
-      } else {
-        await WebBrowser.openBrowserAsync(url);
       }
     } catch (err: any) {
       showAlert({

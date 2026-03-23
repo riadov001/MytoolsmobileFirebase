@@ -8,7 +8,7 @@ import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { adminInvoices, adminClients, sharePdfLink } from "@/lib/admin-api";
+import { adminInvoices, adminClients, sharePdfDirect, getAdminAccessToken } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -323,7 +323,7 @@ export default function InvoiceDetailScreen() {
               setPdfLoading(true);
               try {
                 const ref = inv?.invoiceNumber || inv?.reference || id;
-                const result = await sharePdfLink("invoices", inv?.viewToken, id, ref);
+                const result = await sharePdfDirect("invoices", id, ref);
                 Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                 if (result === "copied") {
                   showAlert({

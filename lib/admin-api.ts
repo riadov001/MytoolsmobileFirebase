@@ -387,30 +387,37 @@ export const adminNotifications = {
   markAllRead: () => adminApiCall<any>("/api/notifications/read-all", { method: "POST" }),
 };
 
-const PWA_BASE = "https://saas3.mytoolsgroup.eu";
-
-export function buildPdfShareUrl(
-  type: "quotes" | "invoices",
-  viewToken: string | null | undefined,
-  id: string
-): string {
-  if (viewToken) {
-    return type === "quotes"
-      ? `${PWA_BASE}/quotes/view/${viewToken}`
-      : `${PWA_BASE}/invoices/view/${viewToken}`;
-  }
-  return type === "quotes"
-    ? `${PWA_BASE}/quotes/view/${id}`
-    : `${PWA_BASE}/invoices/view/${id}`;
+export function getMobilePdfUrl(type: "quotes" | "invoices", id: string): string {
+  return `${API_BASE}/api/mobile/${type}/${id}/pdf`;
 }
 
-export async function sharePdfLink(
+export async function downloadMobilePdf(
   type: "quotes" | "invoices",
-  viewToken: string | null | undefined,
+  id: string
+): Promise<{ blob: Blob; filename: string }> {
+  const url = getMobilePdfUrl(type, id);
+  const headers: Record<string, string> = { Accept: "application/pdf" };
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  const cookie = getSessionCookie();
+  if (cookie) headers["Cookie"] = cookie;
+
+  const res = await fetch(url, { headers });
+  if (!res.ok) {
+    throw new Error(`Erreur ${res.status} lors du téléchargement du PDF`);
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("content-disposition") || "";
+  const match = disposition.match(/filename[^;=\n]*=["']?([^"';\n]*)["']?/);
+  const fallbackName = type === "quotes" ? `devis-${id}.pdf` : `facture-${id}.pdf`;
+  return { blob, filename: match?.[1] || fallbackName };
+}
+
+export async function sharePdfDirect(
+  type: "quotes" | "invoices",
   id: string,
   reference?: string
 ): Promise<"shared" | "copied"> {
-  const url = buildPdfShareUrl(type, viewToken, id);
+  const url = getMobilePdfUrl(type, id);
   const title = type === "quotes"
     ? `Devis ${reference || ""}`
     : `Facture ${reference || ""}`;

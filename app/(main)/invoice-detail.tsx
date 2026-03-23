@@ -17,6 +17,7 @@ import * as Linking from "expo-linking";
 import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { invoicesApi, getBackendUrl, getSessionCookie } from "@/lib/api";
+import { getAdminAccessToken } from "@/lib/admin-api";
 import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
@@ -137,7 +138,6 @@ export default function InvoiceDetailScreen() {
   }
   const invoiceItems = parseItems(rawItems);
   const viewToken = ((invoice as any).viewToken || (invoice as any).pdfToken || (invoice as any).token || (invoice as any).publicToken || (invoice as any).shareToken || (invoice as any).accessToken || (invoice as any).publicId) as string | undefined;
-  const directPdfUrl = (invoice as any).pdfUrl || (invoice as any).pdf_url || (invoice as any).documentUrl || (invoice as any).document_url;
   const displayRef = invoice.invoiceNumber || invoice.id;
   const clientInfo = (invoice as any).client || null;
   const quoteRef = (invoice as any).quoteNumber || (invoice as any).quoteReference || null;
@@ -213,23 +213,40 @@ export default function InvoiceDetailScreen() {
   const isUnpaid = statusLower === "pending" || statusLower === "en_attente"
     || statusLower === "overdue" || statusLower === "en_retard"
     || statusLower === "sent" || statusLower === "envoyee" || statusLower === "envoyée";
-  const pdfUrl = viewToken ? `${getBackendUrl()}/api/proxy/invoice-pdf/${viewToken}` : directPdfUrl || null;
+  const pdfUrl = `${getBackendUrl()}/api/mobile/invoices/${id}/pdf`;
 
   const handleDownloadPdf = async () => {
-    const url = pdfUrl;
-    if (!url) return;
     if (Platform.OS === "web") {
-      try { await WebBrowser.openBrowserAsync(url); } catch { Linking.openURL(url); }
+      try {
+        const headers: Record<string, string> = { Accept: "application/pdf" };
+        const token = getAdminAccessToken();
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        const res = await fetch(pdfUrl, { headers });
+        if (!res.ok) throw new Error(`Erreur ${res.status}`);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `facture-${displayRef || id}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (err: any) {
+        showAlert({ type: "error", title: "Erreur", message: err?.message || "Impossible de télécharger la facture.", buttons: [{ text: "OK", style: "primary" }] });
+      }
       return;
     }
     setDownloading(true);
     try {
+      const token = getAdminAccessToken();
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
       const cookie = getSessionCookie();
-      const filename = `facture-${id}-${Date.now()}.pdf`;
+      if (cookie) headers["Cookie"] = cookie;
+      const filename = `facture-${displayRef || id}-${Date.now()}.pdf`;
       const fileUri = (FileSystem.cacheDirectory ?? "") + filename;
-      const result = await FileSystem.downloadAsync(url, fileUri, {
-        headers: cookie ? { Cookie: cookie } : {},
-      });
+      const result = await FileSystem.downloadAsync(pdfUrl, fileUri, { headers });
       if (result.status !== 200) throw new Error(`Erreur ${result.status}`);
       const sharingAvailable = await Sharing.isAvailableAsync();
       if (sharingAvailable) {
@@ -238,8 +255,6 @@ export default function InvoiceDetailScreen() {
           dialogTitle: "Facture PDF",
           UTI: "com.adobe.pdf",
         });
-      } else {
-        await WebBrowser.openBrowserAsync(url);
       }
     } catch (err: any) {
       showAlert({

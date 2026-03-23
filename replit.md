@@ -12,15 +12,27 @@ This is a mobile application built with Expo React Native, exclusively for admin
 
 ## Social Authentication (Firebase)
 
-Added social login with Google, Apple (iOS), Facebook, and Twitter/X. Uses Firebase Auth JS SDK on the frontend and validates Firebase ID tokens via Firebase REST API on the backend.
+Social login with Google and Apple. Uses Firebase Auth JS SDK on the frontend. Backend proxies Firebase ID tokens to the external API.
 
-### New files
-- `lib/firebase.ts` — Firebase app + auth initialization (inMemoryPersistence)
-- `components/SocialLoginButtons.tsx` — Social login UI (expo-auth-session + expo-apple-authentication)
-- `server/social-auth.ts` — Backend routes: `POST /api/auth/social`, `POST /api/auth/social/onboarding-complete`
+### Auth Flow
+- **Google login**: Firebase `signInWithPopup` → `POST /api/auth/social` (local) → proxied to `POST /api/mobile/auth/login-with-firebase` on external API
+  - **200**: User exists → returns `{accessToken, refreshToken, user}` → navigate to admin/main
+  - **404**: User not found → redirect to `/(auth)/register` with `email`, `displayName`, `firebaseUid`, `idToken` params
+- **Email/password login**: `POST /api/mobile/auth/login` → returns `{accessToken, refreshToken, user}`
+- **Token refresh**: `POST /api/mobile/auth/refresh` with `{refreshToken}`
 
-### New DB table: `social_users`
-Stores social auth users locally with onboarding status.
+### Registration Flow (multi-step)
+1. **SIRET lookup**: User enters SIRET (auto-lookup at 14 digits) or company name → `GET /api/mobile/public/siret-lookup`
+2. **Form**: Company info pre-filled from SIRET, personal info (name, email). Password required only for email registration (not Google).
+3. **Submit**: `POST /api/mobile/auth/register` with flat fields (`siret`, `companyName`, `address`, etc. at root level)
+4. **After registration (Google)**: Auto-login via `POST /api/mobile/auth/login-with-firebase`
+
+### Key files
+- `lib/firebase.ts` — Firebase app + auth initialization
+- `components/SocialLoginButtons.tsx` — Social login UI
+- `server/social-auth.ts` — Backend route: `POST /api/auth/social` (proxies to external API)
+- `app/(auth)/register.tsx` — Multi-step garage registration (SIRET + form + success)
+- `lib/auth-context.tsx` — Auth context with `socialLogin()` returning discriminated union
 
 ### Required environment variables
 **Frontend (EXPO_PUBLIC_*):**
@@ -29,20 +41,22 @@ Stores social auth users locally with onboarding status.
 - `EXPO_PUBLIC_FIREBASE_PROJECT_ID`
 - `EXPO_PUBLIC_FIREBASE_APP_ID`
 - `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`
-- `EXPO_PUBLIC_FACEBOOK_APP_ID`
-- `EXPO_PUBLIC_TWITTER_CLIENT_ID`
 
 **Backend:**
 - `FIREBASE_SERVICE_ACCOUNT_JSON` (Firebase Admin SDK service account JSON)
-- `SOCIAL_JWT_SECRET` (secret for signing social auth JWTs)
 
-### Social auth email verification
-Social login (Google/Apple) now checks if the user's email exists in the external API database before allowing access. Calls `GET https://saas3.mytoolsgroup.eu/api/users/check-email?email=xxx` — returns `{ exists: true/false }`. If the email is not found, login is rejected with a 403 error.
+## PDF Download
 
-### Navigation after social login
-- New user or onboarding not completed → `/onboarding`
-- Returning user with onboarding done → `/(main)`
-- Email not found in external DB → error alert on login screen
+PDF files are downloaded directly from the API (binary response, `Content-Type: application/pdf`). No redirect to PWA.
+
+### Endpoints
+- **Devis**: `GET /api/mobile/quotes/:id/pdf` (auth JWT required)
+- **Facture**: `GET /api/mobile/invoices/:id/pdf` (auth JWT required)
+
+### Implementation
+- Web: `fetch` with `Authorization: Bearer` header → blob → `URL.createObjectURL` → download link
+- Native: `FileSystem.downloadAsync` with auth headers → `Sharing.shareAsync`
+- Admin share: `sharePdfDirect()` in `lib/admin-api.ts` shares the direct API URL
 
 ## System Architecture
 The application is built using Expo React Native with file-based routing via Expo Router for the frontend. It consumes an external API hosted on `saas3.mytoolsgroup.eu`. Authentication is handled via a dual system: Bearer tokens for admin API calls and cookie sessions for client-side interactions. State management utilizes React Query for server data and React Context for authentication.
