@@ -336,27 +336,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(data?.message || "Authentification sociale échouée");
     }
 
-    if (data.accessToken) {
-      await storeToken("access_token", data.accessToken);
-      setStoredAccessToken(data.accessToken);
-      setAdminTokens(data.accessToken, data.refreshToken || null);
-      if (data.refreshToken) {
-        await storeToken("refresh_token", data.refreshToken);
-      }
+    if (!data.accessToken || !data.user) {
+      throw new Error("Réponse d'authentification incomplète");
+    }
+
+    await storeToken("access_token", data.accessToken);
+    setStoredAccessToken(data.accessToken);
+    setAdminTokens(data.accessToken, data.refreshToken || null);
+    if (data.refreshToken) {
+      await storeToken("refresh_token", data.refreshToken);
     }
 
     await removeToken("social_access_token");
 
-    const resolvedUser = data.user;
-    if (resolvedUser) {
-      setUser(resolvedUser as UserProfile);
-    }
+    setUser(data.user as UserProfile);
 
     return {
       status: "authenticated",
       accessToken: data.accessToken,
-      refreshToken: data.refreshToken,
-      user: resolvedUser as UserProfile,
+      refreshToken: data.refreshToken || null,
+      user: data.user as UserProfile,
     };
   };
 

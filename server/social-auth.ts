@@ -141,6 +141,11 @@ export function registerSocialAuthRoutes(app: Express) {
       const externalData = await externalRes.json();
 
       if (externalRes.status === 404) {
+        console.log("[SocialAuth] User not found, needs registration:", {
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          firebaseUid: firebaseUser.uid,
+        });
         return res.status(404).json({
           message: externalData?.message || "Aucun compte trouvé avec cette adresse email.",
           email: firebaseUser.email,
