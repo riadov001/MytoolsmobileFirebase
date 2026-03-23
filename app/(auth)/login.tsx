@@ -106,6 +106,7 @@ export default function LoginScreen() {
               email: result.email || "",
               displayName: result.displayName || "",
               firebaseUid: result.firebaseUid || "",
+              idToken: idToken,
             },
           });
         }, 100);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import {
   View, Text, StyleSheet, ScrollView, Pressable, Platform, TextInput,
   ActivityIndicator, KeyboardAvoidingView, Switch,
@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/theme";
 import { ThemeColors } from "@/constants/theme";
 import { useCustomAlert } from "@/components/CustomAlert";
 import { getBackendUrl } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
 
 type Step = "siret" | "form" | "success";
 
@@ -29,11 +30,14 @@ export default function GarageRegisterScreen() {
   const prefillEmail = Array.isArray(params.email) ? params.email[0] : (params.email as string || "");
   const prefillName = Array.isArray(params.displayName) ? params.displayName[0] : (params.displayName as string || "");
   const firebaseUid = Array.isArray(params.firebaseUid) ? params.firebaseUid[0] : (params.firebaseUid as string || "");
+  const idToken = Array.isArray(params.idToken) ? params.idToken[0] : (params.idToken as string || "");
+  const isGoogleFlow = !!firebaseUid;
 
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const styles = useMemo(() => getStyles(theme), [theme]);
   const { showAlert, AlertComponent } = useCustomAlert();
+  const { socialLogin } = useAuth();
 
   const [step, setStep] = useState<Step>("siret");
   const [loading, setLoading] = useState(false);
@@ -41,6 +45,7 @@ export default function GarageRegisterScreen() {
   const [siretInput, setSiretInput] = useState("");
   const [nameInput, setNameInput] = useState("");
   const [company, setCompany] = useState<CompanyInfo | null>(null);
+  const siretLookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const nameParts = prefillName.split(" ");
   const [firstName, setFirstName] = useState(nameParts[0] || "");
@@ -57,15 +62,10 @@ export default function GarageRegisterScreen() {
   const topPad = Platform.OS === "web" ? 67 + 16 : insets.top + 16;
   const bottomPad = Platform.OS === "web" ? 34 + 24 : insets.bottom + 24;
 
-  const lookupSiret = useCallback(async () => {
-    const query = siretInput.trim() || nameInput.trim();
-    if (!query) {
-      showAlert({ type: "error", title: "Erreur", message: "Veuillez saisir un SIRET ou un nom d'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
-      return;
-    }
+  const doLookup = useCallback(async (query: string, isSiret: boolean) => {
     setLoading(true);
     try {
-      const param = siretInput.trim() ? `siret=${encodeURIComponent(siretInput.trim())}` : `name=${encodeURIComponent(nameInput.trim())}`;
+      const param = isSiret ? `siret=${encodeURIComponent(query)}` : `name=${encodeURIComponent(query)}`;
       const res = await fetch(`${apiBase}/api/mobile/public/siret-lookup?${param}`, {
         headers: { Accept: "application/json" },
       });
@@ -79,18 +79,40 @@ export default function GarageRegisterScreen() {
         address: data.address || "",
         city: data.city || "",
         postalCode: data.postalCode || "",
-        siret: data.siret || siretInput.trim(),
+        siret: data.siret || query,
         siren: data.siren || "",
         legalForm: data.legalForm || "",
         tvaNumber: data.tvaNumber || "",
       });
-      if (!garageName && data.name) setGarageName(data.name);
+      if (!garageName && (data.name || data.companyName)) setGarageName(data.name || data.companyName);
     } catch (err: any) {
-      showAlert({ type: "error", title: "Recherche échouée", message: err.message || "Impossible de trouver l'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
+      if (isSiret) {
+        showAlert({ type: "error", title: "Recherche échouée", message: err.message || "Impossible de trouver l'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
+      }
+      setCompany(null);
     } finally {
       setLoading(false);
     }
-  }, [siretInput, nameInput]);
+  }, [garageName, apiBase]);
+
+  const handleSiretChange = useCallback((text: string) => {
+    const digits = text.replace(/\D/g, "").slice(0, 14);
+    setSiretInput(digits);
+    setCompany(null);
+    if (siretLookupTimer.current) clearTimeout(siretLookupTimer.current);
+    if (digits.length === 14) {
+      siretLookupTimer.current = setTimeout(() => doLookup(digits, true), 300);
+    }
+  }, [doLookup]);
+
+  const lookupManual = useCallback(async () => {
+    const query = siretInput.trim() || nameInput.trim();
+    if (!query) {
+      showAlert({ type: "error", title: "Erreur", message: "Veuillez saisir un SIRET ou un nom d'entreprise.", buttons: [{ text: "OK", style: "primary" }] });
+      return;
+    }
+    await doLookup(query, !!siretInput.trim());
+  }, [siretInput, nameInput, doLookup]);
 
   const checkEmailAndProceed = useCallback(async () => {
     if (!company) return;
@@ -106,7 +128,7 @@ export default function GarageRegisterScreen() {
       showAlert({ type: "error", title: "Erreur", message: "Email requis.", buttons: [{ text: "OK", style: "primary" }] });
       return;
     }
-    if (!firebaseUid) {
+    if (!isGoogleFlow) {
       if (!password || password.length < 8) {
         showAlert({ type: "error", title: "Erreur", message: "Le mot de passe doit contenir au moins 8 caractères.", buttons: [{ text: "OK", style: "primary" }] });
         return;
@@ -137,7 +159,6 @@ export default function GarageRegisterScreen() {
 
       const body: any = {
         email: email.trim(),
-        password: firebaseUid ? undefined : password,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         garageName: garageName.trim() || company?.name || "",
@@ -150,9 +171,12 @@ export default function GarageRegisterScreen() {
         tvaNumber: company?.tvaNumber || "",
         legalForm: company?.legalForm || "",
         smsConsent,
-        firebaseUid: firebaseUid || undefined,
       };
-      Object.keys(body).forEach(k => body[k] === undefined && delete body[k]);
+      if (isGoogleFlow) {
+        body.firebaseUid = firebaseUid;
+      } else {
+        body.password = password;
+      }
 
       const res = await fetch(`${apiBase}/api/mobile/auth/register`, {
         method: "POST",
@@ -166,13 +190,25 @@ export default function GarageRegisterScreen() {
         throw new Error(err?.message || err?.error || "Inscription échouée. Veuillez réessayer.");
       }
 
+      if (isGoogleFlow && idToken) {
+        try {
+          const loginResult = await socialLogin(idToken, "google");
+          if (loginResult.status === "authenticated") {
+            setStep("success");
+            return;
+          }
+        } catch (loginErr: any) {
+          console.error("[Register] Auto-login after registration failed:", loginErr.message);
+        }
+      }
+
       setStep("success");
     } catch (err: any) {
       showAlert({ type: "error", title: "Erreur", message: err.message || "Inscription échouée.", buttons: [{ text: "OK", style: "primary" }] });
     } finally {
       setLoading(false);
     }
-  }, [firstName, lastName, email, password, confirmPassword, garageName, smsConsent, legalConsent, company, firebaseUid]);
+  }, [firstName, lastName, email, password, confirmPassword, garageName, smsConsent, legalConsent, company, firebaseUid, isGoogleFlow, idToken, socialLogin, apiBase]);
 
   const renderSiretStep = () => (
     <>
@@ -186,17 +222,29 @@ export default function GarageRegisterScreen() {
         </Text>
       </View>
 
+      {isGoogleFlow && (
+        <View style={[styles.companyBadge, { backgroundColor: "#10B98115", marginBottom: 16 }]}>
+          <Ionicons name="logo-google" size={16} color="#10B981" />
+          <Text style={[styles.companyBadgeText, { color: "#10B981" }]}>
+            Connecté via Google ({prefillEmail})
+          </Text>
+        </View>
+      )}
+
       <Text style={styles.label}>Numéro SIRET</Text>
       <TextInput
         style={styles.input}
         value={siretInput}
-        onChangeText={setSiretInput}
+        onChangeText={handleSiretChange}
         placeholder="Ex: 12345678901234"
         placeholderTextColor={theme.textTertiary}
         keyboardType="number-pad"
         maxLength={14}
         autoCapitalize="none"
       />
+      {siretInput.length > 0 && siretInput.length < 14 && (
+        <Text style={styles.siretHint}>{siretInput.length}/14 chiffres</Text>
+      )}
 
       <View style={styles.orRow}>
         <View style={styles.orLine} />
@@ -208,7 +256,7 @@ export default function GarageRegisterScreen() {
       <TextInput
         style={styles.input}
         value={nameInput}
-        onChangeText={setNameInput}
+        onChangeText={(t) => { setNameInput(t); setCompany(null); }}
         placeholder="Ex: Mon Garage Auto"
         placeholderTextColor={theme.textTertiary}
         autoCapitalize="words"
@@ -216,7 +264,7 @@ export default function GarageRegisterScreen() {
 
       <Pressable
         style={[styles.primaryBtn, loading && { opacity: 0.6 }]}
-        onPress={lookupSiret}
+        onPress={lookupManual}
         disabled={loading}
       >
         {loading ? (
@@ -236,24 +284,24 @@ export default function GarageRegisterScreen() {
             <Ionicons name="location-outline" size={14} color={theme.textSecondary} />
             <Text style={styles.companyDetail}>{company.address}, {company.postalCode} {company.city}</Text>
           </View>
-          {company.siret && (
+          {company.siret ? (
             <View style={styles.companyRow}>
               <Ionicons name="document-text-outline" size={14} color={theme.textSecondary} />
               <Text style={styles.companyDetail}>SIRET: {company.siret}</Text>
             </View>
-          )}
-          {company.tvaNumber && (
+          ) : null}
+          {company.tvaNumber ? (
             <View style={styles.companyRow}>
               <Ionicons name="receipt-outline" size={14} color={theme.textSecondary} />
               <Text style={styles.companyDetail}>TVA: {company.tvaNumber}</Text>
             </View>
-          )}
-          {company.legalForm && (
+          ) : null}
+          {company.legalForm ? (
             <View style={styles.companyRow}>
               <Ionicons name="briefcase-outline" size={14} color={theme.textSecondary} />
               <Text style={styles.companyDetail}>{company.legalForm}</Text>
             </View>
-          )}
+          ) : null}
           <Pressable style={styles.confirmBtn} onPress={checkEmailAndProceed}>
             <Ionicons name="checkmark-circle" size={18} color="#fff" />
             <Text style={styles.confirmBtnText}>C'est mon entreprise</Text>
@@ -271,11 +319,13 @@ export default function GarageRegisterScreen() {
         </View>
         <Text style={styles.stepTitle}>Vos informations</Text>
         <Text style={styles.stepDesc}>
-          Complétez vos informations pour créer votre compte garage.
+          {isGoogleFlow
+            ? "Complétez les informations de votre garage."
+            : "Complétez vos informations pour créer votre compte garage."}
         </Text>
       </View>
 
-      {!!firebaseUid && (
+      {isGoogleFlow && (
         <View style={[styles.companyBadge, { backgroundColor: "#10B98115", marginBottom: 12 }]}>
           <Ionicons name="logo-google" size={16} color="#10B981" />
           <Text style={[styles.companyBadgeText, { color: "#10B981" }]}>
@@ -310,6 +360,7 @@ export default function GarageRegisterScreen() {
             placeholder="Jean"
             placeholderTextColor={theme.textTertiary}
             autoCapitalize="words"
+            editable={!isGoogleFlow || !nameParts[0]}
           />
         </View>
         <View style={{ flex: 1 }}>
@@ -321,13 +372,14 @@ export default function GarageRegisterScreen() {
             placeholder="Dupont"
             placeholderTextColor={theme.textTertiary}
             autoCapitalize="words"
+            editable={!isGoogleFlow || !nameParts.slice(1).join(" ")}
           />
         </View>
       </View>
 
       <Text style={styles.label}>Email</Text>
       <TextInput
-        style={[styles.input, !!prefillEmail && { opacity: 0.7 }]}
+        style={[styles.input, isGoogleFlow && { opacity: 0.7, backgroundColor: theme.surface }]}
         value={email}
         onChangeText={setEmail}
         placeholder="contact@garage.com"
@@ -335,10 +387,10 @@ export default function GarageRegisterScreen() {
         keyboardType="email-address"
         autoCapitalize="none"
         autoComplete="email"
-        editable={!prefillEmail}
+        editable={!isGoogleFlow}
       />
 
-      {!firebaseUid && (
+      {!isGoogleFlow && (
         <>
           <Text style={styles.label}>Mot de passe</Text>
           <View style={styles.passwordRow}>
@@ -420,14 +472,25 @@ export default function GarageRegisterScreen() {
   const renderSuccessStep = () => (
     <View style={styles.successContainer}>
       <View style={[styles.stepIcon, { backgroundColor: "#10B98120", width: 80, height: 80, borderRadius: 24 }]}>
-        <Ionicons name="mail-outline" size={40} color="#10B981" />
+        <Ionicons name={isGoogleFlow ? "checkmark-circle-outline" : "mail-outline"} size={40} color="#10B981" />
       </View>
-      <Text style={styles.successTitle}>Vérifiez votre email</Text>
+      <Text style={styles.successTitle}>
+        {isGoogleFlow ? "Inscription réussie !" : "Vérifiez votre email"}
+      </Text>
       <Text style={styles.successDesc}>
-        Un email de vérification a été envoyé à{"\n"}
-        <Text style={{ fontFamily: "Inter_600SemiBold", color: theme.text }}>{email}</Text>
-        {"\n\n"}
-        Cliquez sur le lien dans l'email pour activer votre compte, puis connectez-vous.
+        {isGoogleFlow ? (
+          <>
+            Votre compte garage a été créé avec succès.{"\n\n"}
+            Vous pouvez maintenant vous connecter avec Google.
+          </>
+        ) : (
+          <>
+            Un email de vérification a été envoyé à{"\n"}
+            <Text style={{ fontFamily: "Inter_600SemiBold", color: theme.text }}>{email}</Text>
+            {"\n\n"}
+            Cliquez sur le lien dans l'email pour activer votre compte, puis connectez-vous.
+          </>
+        )}
       </Text>
       <Pressable style={styles.primaryBtn} onPress={() => router.replace("/(auth)/login")}>
         <Ionicons name="log-in-outline" size={18} color="#fff" />
@@ -537,6 +600,10 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
     fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text,
     marginBottom: 4,
   },
+  siretHint: {
+    fontSize: 11, fontFamily: "Inter_400Regular", color: theme.textTertiary,
+    marginTop: 2, marginLeft: 4,
+  },
   orRow: { flexDirection: "row", alignItems: "center", marginVertical: 12, gap: 10 },
   orLine: { flex: 1, height: 1, backgroundColor: theme.border },
   orText: { fontSize: 12, fontFamily: "Inter_500Medium", color: theme.textTertiary },
@@ -575,18 +642,18 @@ const getStyles = (theme: ThemeColors) => StyleSheet.create({
   checkbox: {
     width: 22, height: 22, borderRadius: 6,
     borderWidth: 2, borderColor: theme.border,
-    justifyContent: "center", alignItems: "center", marginTop: 1,
+    justifyContent: "center", alignItems: "center", marginTop: 2,
   },
-  checkboxLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.textSecondary, flex: 1, lineHeight: 18 },
+  checkboxLabel: { fontSize: 13, fontFamily: "Inter_400Regular", color: theme.text, flex: 1, lineHeight: 20 },
   backStepBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
-    marginTop: 16,
+    marginTop: 16, paddingVertical: 10,
   },
   backStepText: { fontSize: 14, fontFamily: "Inter_500Medium", color: theme.textSecondary },
-  successContainer: { alignItems: "center", gap: 16, paddingTop: 40 },
+  successContainer: { alignItems: "center", paddingTop: 40, gap: 16 },
   successTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: theme.text },
   successDesc: {
-    fontSize: 15, fontFamily: "Inter_400Regular", color: theme.textSecondary,
+    fontSize: 14, fontFamily: "Inter_400Regular", color: theme.textSecondary,
     textAlign: "center", lineHeight: 22, paddingHorizontal: 10,
   },
 });
